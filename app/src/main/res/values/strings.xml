@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hustl</string>
+    <string name="tagline">Hire talent. Get hired.</string>
+    <string name="login">Sign In</string>
+    <string name="register">Create Account</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="name">Full Name</string>
+    <string name="browse_gigs">Browse Gigs</string>
+    <string name="place_order">Place Order</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_explore">Explore</string>
+    <string name="nav_orders">Orders</string>
+    <string name="nav_inbox">Inbox</string>
+    <string name="nav_profile">Profile</string>
+    <string name="category_all">All</string>
+    <string name="category_design">Design</string>
+    <string name="category_dev">Development</string>
+    <string name="category_writing">Writing</string>
+    <string name="category_marketing">Marketing</string>
+    <string name="category_video">Video</string>
+    <string name="category_music">Music</string>
+    <string name="no_orders">No orders here yet</string>
+    <string name="search_hint">Search gigs, skills, sellers…</string>
+    <string name="gig_title_hint">I will design a professional logo for your brand</string>
+    <string name="requirements_hint">Describe what you need — brand colors, style references…</string>
+</resources>

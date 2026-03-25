@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "207844764612",
+    "project_id": "hustl-3f502",
+    "storage_bucket": "hustl-3f502.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:207844764612:android:a87a42c59f2d0395bc9291",
+        "android_client_info": {
+          "package_name": "com.hustl.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAuRf_PTOHciMg21Fvq1KUW_BdxU5zCLBY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

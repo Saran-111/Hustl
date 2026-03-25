@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingTop="20dp"
+            android:paddingBottom="12dp">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="Profile"
+                android:textSize="24sp" android:textStyle="bold" android:textColor="@color/text_primary"/>
+            <ImageButton android:id="@+id/btnSettings" android:layout_width="38dp"
+                android:layout_height="38dp" android:src="@drawable/ic_settings"
+                android:background="@drawable/bg_icon_btn" android:padding="8dp"
+                android:contentDescription="Settings"/>
+        </LinearLayout>
+
+        <!-- Profile Hero -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingHorizontal="20dp"
+            android:paddingBottom="20dp">
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                app:cardCornerRadius="40dp"
+                app:cardBackgroundColor="@color/surface2"
+                app:cardElevation="0dp"
+                android:layout_marginBottom="12dp">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:text="👤"
+                    android:textSize="32sp"
+                    android:gravity="center" />
+            </androidx.cardview.widget.CardView>
+
+            <TextView android:id="@+id/tvName" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:textSize="22sp"
+                android:textStyle="bold" android:textColor="@color/text_primary"/>
+
+            <TextView android:id="@+id/tvRole" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:textSize="13sp"
+                android:textColor="@color/text_secondary" android:layout_marginTop="4dp"/>
+
+            <TextView android:id="@+id/tvLocation" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:textSize="12sp"
+                android:textColor="@color/text_hint" android:layout_marginTop="4dp"/>
+
+        </LinearLayout>
+
+        <!-- Stats -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingHorizontal="20dp"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical" android:gravity="center"
+                android:background="@drawable/bg_card" android:padding="14dp" android:layout_marginEnd="6dp">
+                <TextView android:id="@+id/tvTotalOrders" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:text="0" android:textSize="24sp"
+                    android:textStyle="bold" android:textColor="@color/accent"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Orders" android:textSize="10sp" android:textColor="@color/text_secondary"/>
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical" android:gravity="center"
+                android:background="@drawable/bg_card" android:padding="14dp" android:layout_marginHorizontal="6dp">
+                <TextView android:id="@+id/tvRating" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:text="0.0" android:textSize="24sp"
+                    android:textStyle="bold" android:textColor="@color/accent"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Rating" android:textSize="10sp" android:textColor="@color/text_secondary"/>
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical" android:gravity="center"
+                android:background="@drawable/bg_card" android:padding="14dp" android:layout_marginStart="6dp">
+                <TextView android:id="@+id/tvReviews" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:text="0" android:textSize="24sp"
+                    android:textStyle="bold" android:textColor="@color/accent"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Reviews" android:textSize="10sp" android:textColor="@color/text_secondary"/>
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Earnings/Balance Card -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="20dp"
+            android:layout_marginBottom="20dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/border"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView android:id="@+id/tvBalanceLabel" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Total Spent" android:textSize="12sp" android:textColor="@color/text_secondary"/>
+
+                <TextView android:id="@+id/tvTotalSpent" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:textSize="32sp"
+                    android:textStyle="bold" android:textColor="@color/accent" android:layout_marginTop="4dp"/>
+
+                <TextView android:id="@+id/tvBalanceFooter" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Loading stats..." android:textSize="12sp"
+                    android:textColor="@color/text_secondary" android:layout_marginTop="4dp"/>
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- Menu Items -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp">
+
+            <LinearLayout android:id="@+id/menuOrders" android:layout_width="match_parent"
+                android:layout_height="56dp" android:orientation="horizontal"
+                android:gravity="center_vertical" android:background="@drawable/bg_card"
+                android:paddingHorizontal="16dp" android:layout_marginBottom="8dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="📋" android:textSize="18sp" android:layout_marginEnd="14dp"/>
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:text="My Orders" android:textSize="14sp"
+                    android:textStyle="bold" android:textColor="@color/text_primary"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="›" android:textSize="20sp" android:textColor="@color/text_secondary"/>
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/menuCreateGig" android:layout_width="match_parent"
+                android:layout_height="56dp" android:orientation="horizontal"
+                android:gravity="center_vertical" android:background="@drawable/bg_card"
+                android:paddingHorizontal="16dp" android:layout_marginBottom="8dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="✨" android:textSize="18sp" android:layout_marginEnd="14dp"/>
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:text="Become a Seller" android:textSize="14sp"
+                    android:textStyle="bold" android:textColor="@color/text_primary"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="›" android:textSize="20sp" android:textColor="@color/text_secondary"/>
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/menuSaved" android:layout_width="match_parent"
+                android:layout_height="56dp" android:orientation="horizontal"
+                android:gravity="center_vertical" android:background="@drawable/bg_card"
+                android:paddingHorizontal="16dp" android:layout_marginBottom="8dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="🔖" android:textSize="18sp" android:layout_marginEnd="14dp"/>
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:text="Saved Gigs" android:textSize="14sp"
+                    android:textStyle="bold" android:textColor="@color/text_primary"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="›" android:textSize="20sp" android:textColor="@color/text_secondary"/>
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/menuPayments" android:layout_width="match_parent"
+                android:layout_height="56dp" android:orientation="horizontal"
+                android:gravity="center_vertical" android:background="@drawable/bg_card"
+                android:paddingHorizontal="16dp" android:layout_marginBottom="8dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="💳" android:textSize="18sp" android:layout_marginEnd="14dp"/>
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:text="Payment Methods" android:textSize="14sp"
+                    android:textStyle="bold" android:textColor="@color/text_primary"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="›" android:textSize="20sp" android:textColor="@color/text_secondary"/>
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/menuSettings" android:layout_width="match_parent"
+                android:layout_height="56dp" android:orientation="horizontal"
+                android:gravity="center_vertical" android:background="@drawable/bg_card"
+                android:paddingHorizontal="16dp" android:layout_marginBottom="8dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="⚙️" android:textSize="18sp" android:layout_marginEnd="14dp"/>
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:text="Settings" android:textSize="14sp"
+                    android:textStyle="bold" android:textColor="@color/text_primary"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="›" android:textSize="20sp" android:textColor="@color/text_secondary"/>
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/menuLogout" android:layout_width="match_parent"
+                android:layout_height="56dp" android:orientation="horizontal"
+                android:gravity="center_vertical" android:background="@drawable/bg_card"
+                android:paddingHorizontal="16dp" android:layout_marginBottom="24dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="🚪" android:textSize="18sp" android:layout_marginEnd="14dp"/>
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:text="Sign Out" android:textSize="14sp"
+                    android:textStyle="bold" android:textColor="@color/accent2"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="›" android:textSize="20sp" android:textColor="@color/text_secondary"/>
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

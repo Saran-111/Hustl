@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#0D0D0D</color>
+    <color name="surface">#161616</color>
+    <color name="surface2">#1E1E1E</color>
+    <color name="surface3">#252525</color>
+    <color name="accent">#E8FF6B</color>
+    <color name="accent_dark">#B8CC44</color>
+    <color name="accent2">#FF6B6B</color>
+    <color name="accent3">#6BFFC8</color>
+    <color name="purple">#A78BFA</color>
+    <color name="orange">#FB923C</color>
+    <color name="text_primary">#F0EDE8</color>
+    <color name="text_secondary">#9A9590</color>
+    <color name="text_muted">#5C5956</color>
+    <color name="text_hint">#5C5956</color>
+    <color name="border">#1A1A1A</color>
+    <color name="border2">#2A2A2A</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="transparent">#00000000</color>
+
+    <!-- Chip states -->
+    <color name="chip_bg_selected">#E8FF6B</color>
+    <color name="chip_bg_unselected">#1E1E1E</color>
+    <color name="chip_text_selected">#0D0D0D</color>
+    <color name="chip_text_unselected">#9A9590</color>
+</resources>

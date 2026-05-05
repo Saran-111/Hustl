@@ -4,7 +4,9 @@ package com.hustl.app.databinding;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.WebView;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
@@ -12,8 +14,11 @@ import android.widget.RadioGroup;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.widget.NestedScrollView;
 import androidx.viewbinding.ViewBinding;
 import androidx.viewbinding.ViewBindings;
+import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 import com.hustl.app.R;
 import java.lang.NullPointerException;
 import java.lang.Override;
@@ -21,13 +26,37 @@ import java.lang.String;
 
 public final class ActivityPaymentBinding implements ViewBinding {
   @NonNull
-  private final LinearLayout rootView;
+  private final FrameLayout rootView;
+
+  @NonNull
+  public final FrameLayout authOverlay;
 
   @NonNull
   public final ImageButton btnBack;
 
   @NonNull
   public final Button btnPay;
+
+  @NonNull
+  public final TextInputEditText etCardNumber;
+
+  @NonNull
+  public final TextInputEditText etCvv;
+
+  @NonNull
+  public final TextInputEditText etExpiry;
+
+  @NonNull
+  public final TextInputEditText etUpiId;
+
+  @NonNull
+  public final LinearLayout layoutCard;
+
+  @NonNull
+  public final TextInputLayout layoutUpi;
+
+  @NonNull
+  public final NestedScrollView mainLayout;
 
   @NonNull
   public final RadioButton rbCard;
@@ -50,13 +79,28 @@ public final class ActivityPaymentBinding implements ViewBinding {
   @NonNull
   public final TextView tvPackageName;
 
-  private ActivityPaymentBinding(@NonNull LinearLayout rootView, @NonNull ImageButton btnBack,
-      @NonNull Button btnPay, @NonNull RadioButton rbCard, @NonNull RadioButton rbUpi,
-      @NonNull RadioButton rbWallet, @NonNull RadioGroup rgPayment, @NonNull TextView tvAmount,
-      @NonNull TextView tvGigTitle, @NonNull TextView tvPackageName) {
+  @NonNull
+  public final WebView webView;
+
+  private ActivityPaymentBinding(@NonNull FrameLayout rootView, @NonNull FrameLayout authOverlay,
+      @NonNull ImageButton btnBack, @NonNull Button btnPay, @NonNull TextInputEditText etCardNumber,
+      @NonNull TextInputEditText etCvv, @NonNull TextInputEditText etExpiry,
+      @NonNull TextInputEditText etUpiId, @NonNull LinearLayout layoutCard,
+      @NonNull TextInputLayout layoutUpi, @NonNull NestedScrollView mainLayout,
+      @NonNull RadioButton rbCard, @NonNull RadioButton rbUpi, @NonNull RadioButton rbWallet,
+      @NonNull RadioGroup rgPayment, @NonNull TextView tvAmount, @NonNull TextView tvGigTitle,
+      @NonNull TextView tvPackageName, @NonNull WebView webView) {
     this.rootView = rootView;
+    this.authOverlay = authOverlay;
     this.btnBack = btnBack;
     this.btnPay = btnPay;
+    this.etCardNumber = etCardNumber;
+    this.etCvv = etCvv;
+    this.etExpiry = etExpiry;
+    this.etUpiId = etUpiId;
+    this.layoutCard = layoutCard;
+    this.layoutUpi = layoutUpi;
+    this.mainLayout = mainLayout;
     this.rbCard = rbCard;
     this.rbUpi = rbUpi;
     this.rbWallet = rbWallet;
@@ -64,11 +108,12 @@ public final class ActivityPaymentBinding implements ViewBinding {
     this.tvAmount = tvAmount;
     this.tvGigTitle = tvGigTitle;
     this.tvPackageName = tvPackageName;
+    this.webView = webView;
   }
 
   @Override
   @NonNull
-  public LinearLayout getRoot() {
+  public FrameLayout getRoot() {
     return rootView;
   }
 
@@ -93,6 +138,12 @@ public final class ActivityPaymentBinding implements ViewBinding {
     // This is done to optimize the compiled bytecode for size and performance.
     int id;
     missingId: {
+      id = R.id.authOverlay;
+      FrameLayout authOverlay = ViewBindings.findChildViewById(rootView, id);
+      if (authOverlay == null) {
+        break missingId;
+      }
+
       id = R.id.btnBack;
       ImageButton btnBack = ViewBindings.findChildViewById(rootView, id);
       if (btnBack == null) {
@@ -102,6 +153,48 @@ public final class ActivityPaymentBinding implements ViewBinding {
       id = R.id.btnPay;
       Button btnPay = ViewBindings.findChildViewById(rootView, id);
       if (btnPay == null) {
+        break missingId;
+      }
+
+      id = R.id.etCardNumber;
+      TextInputEditText etCardNumber = ViewBindings.findChildViewById(rootView, id);
+      if (etCardNumber == null) {
+        break missingId;
+      }
+
+      id = R.id.etCvv;
+      TextInputEditText etCvv = ViewBindings.findChildViewById(rootView, id);
+      if (etCvv == null) {
+        break missingId;
+      }
+
+      id = R.id.etExpiry;
+      TextInputEditText etExpiry = ViewBindings.findChildViewById(rootView, id);
+      if (etExpiry == null) {
+        break missingId;
+      }
+
+      id = R.id.etUpiId;
+      TextInputEditText etUpiId = ViewBindings.findChildViewById(rootView, id);
+      if (etUpiId == null) {
+        break missingId;
+      }
+
+      id = R.id.layoutCard;
+      LinearLayout layoutCard = ViewBindings.findChildViewById(rootView, id);
+      if (layoutCard == null) {
+        break missingId;
+      }
+
+      id = R.id.layoutUpi;
+      TextInputLayout layoutUpi = ViewBindings.findChildViewById(rootView, id);
+      if (layoutUpi == null) {
+        break missingId;
+      }
+
+      id = R.id.mainLayout;
+      NestedScrollView mainLayout = ViewBindings.findChildViewById(rootView, id);
+      if (mainLayout == null) {
         break missingId;
       }
 
@@ -147,8 +240,15 @@ public final class ActivityPaymentBinding implements ViewBinding {
         break missingId;
       }
 
-      return new ActivityPaymentBinding((LinearLayout) rootView, btnBack, btnPay, rbCard, rbUpi,
-          rbWallet, rgPayment, tvAmount, tvGigTitle, tvPackageName);
+      id = R.id.webView;
+      WebView webView = ViewBindings.findChildViewById(rootView, id);
+      if (webView == null) {
+        break missingId;
+      }
+
+      return new ActivityPaymentBinding((FrameLayout) rootView, authOverlay, btnBack, btnPay,
+          etCardNumber, etCvv, etExpiry, etUpiId, layoutCard, layoutUpi, mainLayout, rbCard, rbUpi,
+          rbWallet, rgPayment, tvAmount, tvGigTitle, tvPackageName, webView);
     }
     String missingId = rootView.getResources().getResourceName(id);
     throw new NullPointerException("Missing required view with ID: ".concat(missingId));

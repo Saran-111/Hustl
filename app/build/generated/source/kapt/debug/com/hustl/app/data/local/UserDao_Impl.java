@@ -5,6 +5,7 @@ import android.os.CancellationSignal;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.room.CoroutinesRoom;
+import androidx.room.EntityDeletionOrUpdateAdapter;
 import androidx.room.EntityInsertionAdapter;
 import androidx.room.RoomDatabase;
 import androidx.room.RoomSQLiteQuery;
@@ -32,13 +33,15 @@ public final class UserDao_Impl implements UserDao {
 
   private final EntityInsertionAdapter<User> __insertionAdapterOfUser;
 
+  private final EntityDeletionOrUpdateAdapter<User> __updateAdapterOfUser;
+
   public UserDao_Impl(@NonNull final RoomDatabase __db) {
     this.__db = __db;
     this.__insertionAdapterOfUser = new EntityInsertionAdapter<User>(__db) {
       @Override
       @NonNull
       protected String createQuery() {
-        return "INSERT OR REPLACE INTO `users` (`userId`,`name`,`email`,`password`,`role`,`bio`,`profileImageUrl`,`rating`,`totalOrders`,`location`,`createdAt`) VALUES (?,?,?,?,?,?,?,?,?,?,?)";
+        return "INSERT OR REPLACE INTO `users` (`userId`,`name`,`email`,`password`,`role`,`bio`,`profileImageUrl`,`rating`,`totalOrders`,`location`,`walletBalance`,`createdAt`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
       }
 
       @Override
@@ -86,13 +89,75 @@ public final class UserDao_Impl implements UserDao {
         } else {
           statement.bindString(10, entity.getLocation());
         }
-        statement.bindLong(11, entity.getCreatedAt());
+        statement.bindLong(11, entity.getWalletBalance());
+        statement.bindLong(12, entity.getCreatedAt());
+      }
+    };
+    this.__updateAdapterOfUser = new EntityDeletionOrUpdateAdapter<User>(__db) {
+      @Override
+      @NonNull
+      protected String createQuery() {
+        return "UPDATE OR ABORT `users` SET `userId` = ?,`name` = ?,`email` = ?,`password` = ?,`role` = ?,`bio` = ?,`profileImageUrl` = ?,`rating` = ?,`totalOrders` = ?,`location` = ?,`walletBalance` = ?,`createdAt` = ? WHERE `userId` = ?";
+      }
+
+      @Override
+      protected void bind(@NonNull final SupportSQLiteStatement statement,
+          @NonNull final User entity) {
+        if (entity.getUserId() == null) {
+          statement.bindNull(1);
+        } else {
+          statement.bindString(1, entity.getUserId());
+        }
+        if (entity.getName() == null) {
+          statement.bindNull(2);
+        } else {
+          statement.bindString(2, entity.getName());
+        }
+        if (entity.getEmail() == null) {
+          statement.bindNull(3);
+        } else {
+          statement.bindString(3, entity.getEmail());
+        }
+        if (entity.getPassword() == null) {
+          statement.bindNull(4);
+        } else {
+          statement.bindString(4, entity.getPassword());
+        }
+        if (entity.getRole() == null) {
+          statement.bindNull(5);
+        } else {
+          statement.bindString(5, entity.getRole());
+        }
+        if (entity.getBio() == null) {
+          statement.bindNull(6);
+        } else {
+          statement.bindString(6, entity.getBio());
+        }
+        if (entity.getProfileImageUrl() == null) {
+          statement.bindNull(7);
+        } else {
+          statement.bindString(7, entity.getProfileImageUrl());
+        }
+        statement.bindDouble(8, entity.getRating());
+        statement.bindLong(9, entity.getTotalOrders());
+        if (entity.getLocation() == null) {
+          statement.bindNull(10);
+        } else {
+          statement.bindString(10, entity.getLocation());
+        }
+        statement.bindLong(11, entity.getWalletBalance());
+        statement.bindLong(12, entity.getCreatedAt());
+        if (entity.getUserId() == null) {
+          statement.bindNull(13);
+        } else {
+          statement.bindString(13, entity.getUserId());
+        }
       }
     };
   }
 
   @Override
-  public Object insertUser(final User user, final Continuation<? super Unit> arg1) {
+  public Object insertUser(final User user, final Continuation<? super Unit> $completion) {
     return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
       @Override
       @NonNull
@@ -106,11 +171,29 @@ public final class UserDao_Impl implements UserDao {
           __db.endTransaction();
         }
       }
-    }, arg1);
+    }, $completion);
   }
 
   @Override
-  public Object getUserById(final String uid, final Continuation<? super User> arg1) {
+  public Object updateUser(final User user, final Continuation<? super Unit> $completion) {
+    return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
+      @Override
+      @NonNull
+      public Unit call() throws Exception {
+        __db.beginTransaction();
+        try {
+          __updateAdapterOfUser.handle(user);
+          __db.setTransactionSuccessful();
+          return Unit.INSTANCE;
+        } finally {
+          __db.endTransaction();
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
+  public Object getUserById(final String uid, final Continuation<? super User> $completion) {
     final String _sql = "SELECT * FROM users WHERE userId = ?";
     final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
     int _argIndex = 1;
@@ -136,6 +219,7 @@ public final class UserDao_Impl implements UserDao {
           final int _cursorIndexOfRating = CursorUtil.getColumnIndexOrThrow(_cursor, "rating");
           final int _cursorIndexOfTotalOrders = CursorUtil.getColumnIndexOrThrow(_cursor, "totalOrders");
           final int _cursorIndexOfLocation = CursorUtil.getColumnIndexOrThrow(_cursor, "location");
+          final int _cursorIndexOfWalletBalance = CursorUtil.getColumnIndexOrThrow(_cursor, "walletBalance");
           final int _cursorIndexOfCreatedAt = CursorUtil.getColumnIndexOrThrow(_cursor, "createdAt");
           final User _result;
           if (_cursor.moveToFirst()) {
@@ -191,9 +275,11 @@ public final class UserDao_Impl implements UserDao {
             } else {
               _tmpLocation = _cursor.getString(_cursorIndexOfLocation);
             }
+            final int _tmpWalletBalance;
+            _tmpWalletBalance = _cursor.getInt(_cursorIndexOfWalletBalance);
             final long _tmpCreatedAt;
             _tmpCreatedAt = _cursor.getLong(_cursorIndexOfCreatedAt);
-            _result = new User(_tmpUserId,_tmpName,_tmpEmail,_tmpPassword,_tmpRole,_tmpBio,_tmpProfileImageUrl,_tmpRating,_tmpTotalOrders,_tmpLocation,_tmpCreatedAt);
+            _result = new User(_tmpUserId,_tmpName,_tmpEmail,_tmpPassword,_tmpRole,_tmpBio,_tmpProfileImageUrl,_tmpRating,_tmpTotalOrders,_tmpLocation,_tmpWalletBalance,_tmpCreatedAt);
           } else {
             _result = null;
           }
@@ -203,11 +289,11 @@ public final class UserDao_Impl implements UserDao {
           _statement.release();
         }
       }
-    }, arg1);
+    }, $completion);
   }
 
   @Override
-  public Object getUserByEmail(final String email, final Continuation<? super User> arg1) {
+  public Object getUserByEmail(final String email, final Continuation<? super User> $completion) {
     final String _sql = "SELECT * FROM users WHERE email = ? LIMIT 1";
     final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
     int _argIndex = 1;
@@ -233,6 +319,7 @@ public final class UserDao_Impl implements UserDao {
           final int _cursorIndexOfRating = CursorUtil.getColumnIndexOrThrow(_cursor, "rating");
           final int _cursorIndexOfTotalOrders = CursorUtil.getColumnIndexOrThrow(_cursor, "totalOrders");
           final int _cursorIndexOfLocation = CursorUtil.getColumnIndexOrThrow(_cursor, "location");
+          final int _cursorIndexOfWalletBalance = CursorUtil.getColumnIndexOrThrow(_cursor, "walletBalance");
           final int _cursorIndexOfCreatedAt = CursorUtil.getColumnIndexOrThrow(_cursor, "createdAt");
           final User _result;
           if (_cursor.moveToFirst()) {
@@ -288,9 +375,11 @@ public final class UserDao_Impl implements UserDao {
             } else {
               _tmpLocation = _cursor.getString(_cursorIndexOfLocation);
             }
+            final int _tmpWalletBalance;
+            _tmpWalletBalance = _cursor.getInt(_cursorIndexOfWalletBalance);
             final long _tmpCreatedAt;
             _tmpCreatedAt = _cursor.getLong(_cursorIndexOfCreatedAt);
-            _result = new User(_tmpUserId,_tmpName,_tmpEmail,_tmpPassword,_tmpRole,_tmpBio,_tmpProfileImageUrl,_tmpRating,_tmpTotalOrders,_tmpLocation,_tmpCreatedAt);
+            _result = new User(_tmpUserId,_tmpName,_tmpEmail,_tmpPassword,_tmpRole,_tmpBio,_tmpProfileImageUrl,_tmpRating,_tmpTotalOrders,_tmpLocation,_tmpWalletBalance,_tmpCreatedAt);
           } else {
             _result = null;
           }
@@ -300,7 +389,7 @@ public final class UserDao_Impl implements UserDao {
           _statement.release();
         }
       }
-    }, arg1);
+    }, $completion);
   }
 
   @NonNull

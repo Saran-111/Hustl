@@ -42,14 +42,14 @@ public final class AppDatabase_Impl extends AppDatabase {
     final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(1) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
-        db.execSQL("CREATE TABLE IF NOT EXISTS `users` (`userId` TEXT NOT NULL, `name` TEXT NOT NULL, `email` TEXT NOT NULL, `password` TEXT NOT NULL, `role` TEXT NOT NULL, `bio` TEXT NOT NULL, `profileImageUrl` TEXT NOT NULL, `rating` REAL NOT NULL, `totalOrders` INTEGER NOT NULL, `location` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`userId`))");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `users` (`userId` TEXT NOT NULL, `name` TEXT NOT NULL, `email` TEXT NOT NULL, `password` TEXT NOT NULL, `role` TEXT NOT NULL, `bio` TEXT NOT NULL, `profileImageUrl` TEXT NOT NULL, `rating` REAL NOT NULL, `totalOrders` INTEGER NOT NULL, `location` TEXT NOT NULL, `walletBalance` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`userId`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `gigs` (`gigId` TEXT NOT NULL, `sellerId` TEXT NOT NULL, `sellerName` TEXT NOT NULL, `sellerImageUrl` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT NOT NULL, `category` TEXT NOT NULL, `tags` TEXT NOT NULL, `imageUrl` TEXT NOT NULL, `rating` REAL NOT NULL, `reviewCount` INTEGER NOT NULL, `packages` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `isActive` INTEGER NOT NULL, PRIMARY KEY(`gigId`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `orders` (`orderId` TEXT NOT NULL, `gigId` TEXT NOT NULL, `gigTitle` TEXT NOT NULL, `buyerId` TEXT NOT NULL, `sellerId` TEXT NOT NULL, `sellerName` TEXT NOT NULL, `packageName` TEXT NOT NULL, `price` INTEGER NOT NULL, `status` TEXT NOT NULL, `requirements` TEXT NOT NULL, `progress` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `deliveryDate` INTEGER NOT NULL, PRIMARY KEY(`orderId`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `chats` (`chatId` TEXT NOT NULL, `participants` TEXT NOT NULL, `participantNames` TEXT NOT NULL, `gigId` TEXT NOT NULL, `gigTitle` TEXT NOT NULL, `lastMessage` TEXT NOT NULL, `lastMessageTime` INTEGER NOT NULL, `unreadCount` INTEGER NOT NULL, PRIMARY KEY(`chatId`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `messages` (`messageId` TEXT NOT NULL, `chatId` TEXT NOT NULL, `senderId` TEXT NOT NULL, `senderName` TEXT NOT NULL, `text` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `isRead` INTEGER NOT NULL, PRIMARY KEY(`messageId`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `reviews` (`reviewId` TEXT NOT NULL, `gigId` TEXT NOT NULL, `orderId` TEXT NOT NULL, `buyerId` TEXT NOT NULL, `buyerName` TEXT NOT NULL, `rating` REAL NOT NULL, `comment` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`reviewId`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3c6fcba539e7d6f726d9dbbc34e7ecea')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1bd5ad890513c3a4e35bb1075fa85cb9')");
       }
 
       @Override
@@ -103,7 +103,7 @@ public final class AppDatabase_Impl extends AppDatabase {
       @NonNull
       public RoomOpenHelper.ValidationResult onValidateSchema(
           @NonNull final SupportSQLiteDatabase db) {
-        final HashMap<String, TableInfo.Column> _columnsUsers = new HashMap<String, TableInfo.Column>(11);
+        final HashMap<String, TableInfo.Column> _columnsUsers = new HashMap<String, TableInfo.Column>(12);
         _columnsUsers.put("userId", new TableInfo.Column("userId", "TEXT", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsUsers.put("name", new TableInfo.Column("name", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsUsers.put("email", new TableInfo.Column("email", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
@@ -114,6 +114,7 @@ public final class AppDatabase_Impl extends AppDatabase {
         _columnsUsers.put("rating", new TableInfo.Column("rating", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsUsers.put("totalOrders", new TableInfo.Column("totalOrders", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsUsers.put("location", new TableInfo.Column("location", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsUsers.put("walletBalance", new TableInfo.Column("walletBalance", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsUsers.put("createdAt", new TableInfo.Column("createdAt", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         final HashSet<TableInfo.ForeignKey> _foreignKeysUsers = new HashSet<TableInfo.ForeignKey>(0);
         final HashSet<TableInfo.Index> _indicesUsers = new HashSet<TableInfo.Index>(0);
@@ -226,7 +227,7 @@ public final class AppDatabase_Impl extends AppDatabase {
         }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "3c6fcba539e7d6f726d9dbbc34e7ecea", "4239c0a0525bef443a6edfae08ff789e");
+    }, "1bd5ad890513c3a4e35bb1075fa85cb9", "de7c2096ecadb6b3a199d0036ee8fe4c");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;

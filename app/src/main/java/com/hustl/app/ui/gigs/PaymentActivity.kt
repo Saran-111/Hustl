@@ -3,6 +3,9 @@ package com.hustl.app.ui.gigs
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -11,6 +14,7 @@ import com.hustl.app.data.repository.AuthRepository
 import com.hustl.app.data.repository.OrderRepository
 import com.hustl.app.databinding.ActivityPaymentBinding
 import kotlinx.coroutines.launch
+import java.util.*
 
 class PaymentActivity : AppCompatActivity() {
 
@@ -18,6 +22,10 @@ class PaymentActivity : AppCompatActivity() {
     private lateinit var orderRepo: OrderRepository
     private lateinit var authRepo: AuthRepository
     private var walletBalance = 0
+    private var generatedKey: String? = null
+
+    // Pending order details to use after authentication
+    private var pendingOrderData: Bundle? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,6 +34,10 @@ class PaymentActivity : AppCompatActivity() {
 
         orderRepo = OrderRepository(this)
         authRepo = AuthRepository(this)
+
+        setupPaymentMethods()
+        loadWalletBalance()
+        setupWebView()
 
         val gigId = intent.getStringExtra("gig_id") ?: ""
         val gigTitle = intent.getStringExtra("gig_title") ?: ""
@@ -38,14 +50,20 @@ class PaymentActivity : AppCompatActivity() {
         binding.tvPackageName.text = packageName
         binding.tvAmount.text = "₹${"%,d".format(price)}"
 
-        setupPaymentMethods()
-        loadWalletBalance()
-
         binding.btnBack.setOnClickListener { finish() }
 
         binding.btnPay.setOnClickListener {
-            if (validateInputs(price)) processPayment(gigId, gigTitle, sellerName, packageName, price, requirements)
+            if (validateInputs(price)) {
+                startAuthentication(gigId, gigTitle, sellerName, packageName, price, requirements)
             }
+        }
+    }
+
+    private fun setupWebView() {
+        binding.webView.apply {
+            settings.javaScriptEnabled = true
+            addJavascriptInterface(WebAppInterface(), "Android")
+            webViewClient = WebViewClient()
         }
     }
 
@@ -113,6 +131,63 @@ class PaymentActivity : AppCompatActivity() {
         }
     }
 
+    private fun startAuthentication(
+        gigId: String,
+        gigTitle: String,
+        sellerName: String,
+        packageName: String,
+        price: Int,
+        requirements: String
+    ) {
+        // Store order details for later
+        pendingOrderData = Bundle().apply {
+            putString("gig_id", gigId)
+            putString("gig_title", gigTitle)
+            putString("seller_name", sellerName)
+            putString("package_name", packageName)
+            putInt("price", price)
+            putString("requirements", requirements)
+        }
+
+        // Generate a random encrypted-style key
+        generatedKey = UUID.randomUUID().toString().substring(0, 8).uppercase()
+
+        // Show the WebView overlay
+        binding.authOverlay.visibility = View.VISIBLE
+        binding.webView.loadUrl("file:///android_asset/payment_auth.html?auth_key=$generatedKey")
+    }
+
+    inner class WebAppInterface {
+        @JavascriptInterface
+        fun onAuthFinished(responseKey: String) {
+            runOnUiThread {
+                binding.authOverlay.visibility = View.GONE
+                verifyAndProcess(responseKey)
+            }
+        }
+    }
+
+    private fun verifyAndProcess(responseKey: String) {
+        val expectedResponse = generatedKey?.reversed() + "_VERIFIED"
+        
+        if (responseKey == expectedResponse) {
+            pendingOrderData?.let { data ->
+                processPayment(
+                    data.getString("gig_id") ?: "",
+                    data.getString("gig_title") ?: "",
+                    data.getString("seller_name") ?: "",
+                    data.getString("package_name") ?: "",
+                    data.getInt("price"),
+                    data.getString("requirements") ?: ""
+                )
+            }
+        } else {
+            Toast.makeText(this, "Authentication Failed. Payment Security Breach.", Toast.LENGTH_LONG).show()
+            binding.btnPay.isEnabled = true
+            binding.btnPay.text = "Pay Now"
+        }
+    }
+
     private fun processPayment(
         gigId: String,
         gigTitle: String,
@@ -125,7 +200,7 @@ class PaymentActivity : AppCompatActivity() {
         binding.btnPay.text = "Authorizing..."
 
         lifecycleScope.launch {
-            kotlinx.coroutines.delay(2000)
+            kotlinx.coroutines.delay(1000)
 
             val currentUser = authRepo.currentUser
             if (currentUser == null) {
@@ -161,6 +236,7 @@ class PaymentActivity : AppCompatActivity() {
             val result = orderRepo.placeOrder(order)
             result.fold(
                 onSuccess = { orderId ->
+                    Toast.makeText(this@PaymentActivity, "Payment Successful", Toast.LENGTH_SHORT).show()
                     val intent = Intent(this@PaymentActivity, OrderSuccessActivity::class.java)
                     intent.putExtra("order_id", orderId)
                     intent.putExtra("price", price)

@@ -1,33 +1,32 @@
 package com.hustl.app.data.repository
 
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+import android.content.Context
+import com.hustl.app.data.local.AppDatabase
 import com.hustl.app.data.model.Order
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
 
-class OrderRepository {
-    private val db = FirebaseFirestore.getInstance()
-    private val auth = FirebaseAuth.getInstance()
+class OrderRepository(context: Context) {
+    private val orderDao = AppDatabase.getDatabase(context).orderDao()
 
     suspend fun placeOrder(order: Order): Result<String> {
         return try {
-            val ref = db.collection("orders").document()
-            val orderWithId = order.copy(orderId = ref.id)
-            ref.set(orderWithId).await()
-            Result.success(ref.id)
+            val orderId = "HU-${(1000..9999).random()}"
+            val orderWithId = order.copy(orderId = orderId)
+            orderDao.insertOrder(orderWithId)
+            Result.success(orderId)
         } catch (e: Exception) {
-            Result.success("HU-${(1000..9999).random()}")
+            Result.failure(e)
         }
     }
 
-    suspend fun getMyOrders(buyerId: String): List<Order> {
-        return try {
-            val snapshot = db.collection("orders")
-                .whereEqualTo("buyerId", buyerId)
-                .get().await()
-            snapshot.toObjects(Order::class.java)
-        } catch (e: Exception) {
-            getSampleOrders()
+    fun getMyOrders(userId: String): Flow<List<Order>> {
+        return orderDao.getOrdersForUser(userId).onStart {
+            val current = orderDao.getOrdersForUser(userId).first()
+            if (current.isEmpty() && userId == "user1") {
+                getSampleOrders().forEach { orderDao.insertOrder(it) }
+            }
         }
     }
 

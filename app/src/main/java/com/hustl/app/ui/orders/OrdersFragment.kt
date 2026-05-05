@@ -9,17 +9,27 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.tabs.TabLayout
 import com.hustl.app.adapters.OrderAdapter
+import com.hustl.app.data.model.Order
+import com.hustl.app.data.repository.AuthRepository
 import com.hustl.app.data.repository.OrderRepository
 import com.hustl.app.databinding.FragmentOrdersBinding
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class OrdersFragment : Fragment() {
 
     private var _binding: FragmentOrdersBinding? = null
     private val binding get() = _binding!!
-    private val orderRepo = OrderRepository()
+    private lateinit var orderRepo: OrderRepository
+    private lateinit var authRepo: AuthRepository
     private lateinit var orderAdapter: OrderAdapter
-    private val allOrders by lazy { orderRepo.getSampleOrders() }
+    private var allOrders: List<Order> = emptyList()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        orderRepo = OrderRepository(requireContext())
+        authRepo = AuthRepository(requireContext())
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentOrdersBinding.inflate(inflater, container, false)
@@ -35,22 +45,34 @@ class OrdersFragment : Fragment() {
             adapter = orderAdapter
         }
 
-        filterOrders("active")
+        observeOrders()
 
         binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
-                when (tab?.position) {
-                    0 -> filterOrders("active")
-                    1 -> filterOrders("completed")
-                    2 -> filterOrders("pending")
-                }
+                applyFilter()
             }
             override fun onTabUnselected(tab: TabLayout.Tab?) {}
             override fun onTabReselected(tab: TabLayout.Tab?) {}
         })
     }
 
-    private fun filterOrders(status: String) {
+    private fun observeOrders() {
+        val currentUser = authRepo.currentUser
+        lifecycleScope.launch {
+            orderRepo.getMyOrders(currentUser?.userId ?: "user1").collectLatest { orders ->
+                allOrders = orders
+                applyFilter()
+            }
+        }
+    }
+
+    private fun applyFilter() {
+        val status = when (binding.tabLayout.selectedTabPosition) {
+            0 -> "active"
+            1 -> "completed"
+            2 -> "pending"
+            else -> "active"
+        }
         val filtered = allOrders.filter { it.status == status }
         orderAdapter.updateList(filtered)
         binding.tvEmpty.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE

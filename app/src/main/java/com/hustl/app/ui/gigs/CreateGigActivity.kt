@@ -4,9 +4,9 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.google.firebase.auth.FirebaseAuth
 import com.hustl.app.data.model.Gig
 import com.hustl.app.data.model.GigPackage
+import com.hustl.app.data.repository.AuthRepository
 import com.hustl.app.data.repository.GigRepository
 import com.hustl.app.databinding.ActivityCreateGigBinding
 import kotlinx.coroutines.launch
@@ -14,12 +14,16 @@ import kotlinx.coroutines.launch
 class CreateGigActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityCreateGigBinding
-    private val gigRepo = GigRepository()
+    private lateinit var gigRepo: GigRepository
+    private lateinit var authRepo: AuthRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityCreateGigBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        
+        gigRepo = GigRepository(this)
+        authRepo = AuthRepository(this)
 
         binding.btnBack.setOnClickListener { finish() }
         binding.btnPublish.setOnClickListener { publishGig() }
@@ -36,11 +40,13 @@ class CreateGigActivity : AppCompatActivity() {
         if (description.isEmpty()) { binding.etDescription.error = "Description is required"; return }
         if (basicPrice == 0) { binding.etBasicPrice.error = "Set a price"; return }
 
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: "user1"
+        val currentUser = authRepo.currentUser
+        val uid = currentUser?.userId ?: "user1"
+        val name = currentUser?.name ?: "You"
 
         val gig = Gig(
             sellerId = uid,
-            sellerName = "You",
+            sellerName = name,
             title = title,
             description = description,
             category = category,
@@ -61,8 +67,8 @@ class CreateGigActivity : AppCompatActivity() {
                     finish()
                 },
                 onFailure = {
-                    Toast.makeText(this@CreateGigActivity, "Published locally! Connect Firebase to save.", Toast.LENGTH_LONG).show()
-                    finish()
+                    Toast.makeText(this@CreateGigActivity, "Failed to publish gig", Toast.LENGTH_LONG).show()
+                    binding.btnPublish.isEnabled = true
                 }
             )
         }

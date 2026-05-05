@@ -13,14 +13,22 @@ import com.hustl.app.data.repository.OrderRepository
 import com.hustl.app.databinding.FragmentProfileBinding
 import com.hustl.app.ui.auth.LoginActivity
 import com.hustl.app.ui.gigs.CreateGigActivity
+import com.hustl.app.ui.gigs.WalletActivity
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class ProfileFragment : Fragment() {
 
     private var _binding: FragmentProfileBinding? = null
     private val binding get() = _binding!!
-    private val authRepo = AuthRepository()
-    private val orderRepo = OrderRepository()
+    private lateinit var authRepo: AuthRepository
+    private lateinit var orderRepo: OrderRepository
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        authRepo = AuthRepository(requireContext())
+        orderRepo = OrderRepository(requireContext())
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentProfileBinding.inflate(inflater, container, false)
@@ -46,7 +54,8 @@ class ProfileFragment : Fragment() {
         }
 
         binding.menuPayments.setOnClickListener {
-            Toast.makeText(requireContext(), "Payment methods coming soon!", Toast.LENGTH_SHORT).show()
+            // Updated to open the dynamic Wallet screen
+            startActivity(Intent(requireContext(), WalletActivity::class.java))
         }
 
         binding.menuSettings.setOnClickListener {
@@ -64,30 +73,31 @@ class ProfileFragment : Fragment() {
         val currentUser = authRepo.currentUser ?: return
         
         lifecycleScope.launch {
-            val user = authRepo.getUserProfile(currentUser.uid)
-            val orders = orderRepo.getMyOrders(user.userId)
+            val user = authRepo.getUserProfile(currentUser.userId)
             
             binding.tvName.text = user.name.ifEmpty { "User" }
             binding.tvRole.text = "${user.role.replaceFirstChar { it.uppercase() }} · Member since 2024"
             binding.tvLocation.text = user.location.ifEmpty { "Location not set" }
-            
-            binding.tvTotalOrders.text = orders.size.toString()
             binding.tvRating.text = String.format("%.1f", user.rating)
-            binding.tvReviews.text = (orders.size / 2).toString() // Simplified logic
 
-            if (user.role == "seller") {
-                binding.tvBalanceLabel.text = "Total Earnings"
-                val totalEarnings = orders.filter { it.status == "completed" }.sumOf { it.price }
-                binding.tvTotalSpent.text = "₹${"%,d".format(totalEarnings)}"
-                binding.tvBalanceFooter.text = "From ${orders.count { it.status == "completed" }} completed orders"
-                binding.menuCreateGig.visibility = View.VISIBLE
-            } else {
-                binding.tvBalanceLabel.text = "Total Spent"
-                val totalSpent = orders.sumOf { it.price }
-                binding.tvTotalSpent.text = "₹${"%,d".format(totalSpent)}"
-                val activeCount = orders.count { it.status == "active" || it.status == "pending" }
-                binding.tvBalanceFooter.text = "Across ${orders.size} orders · $activeCount active"
-                binding.menuCreateGig.visibility = View.GONE
+            orderRepo.getMyOrders(user.userId).collectLatest { orders ->
+                binding.tvTotalOrders.text = orders.size.toString()
+                binding.tvReviews.text = (orders.size / 2).toString()
+
+                if (user.role == "seller") {
+                    binding.tvBalanceLabel.text = "Total Earnings"
+                    val totalEarnings = orders.filter { it.status == "completed" }.sumOf { it.price }
+                    binding.tvTotalSpent.text = "₹${"%,d".format(totalEarnings)}"
+                    binding.tvBalanceFooter.text = "From ${orders.count { it.status == "completed" }} completed orders"
+                    binding.menuCreateGig.visibility = View.VISIBLE
+                } else {
+                    binding.tvBalanceLabel.text = "Wallet Balance"
+                    // Show live wallet balance in the main card
+                    binding.tvTotalSpent.text = "₹${"%,d".format(user.walletBalance)}"
+                    val activeCount = orders.count { it.status == "active" || it.status == "pending" }
+                    binding.tvBalanceFooter.text = "Across ${orders.size} orders · $activeCount active"
+                    binding.menuCreateGig.visibility = View.GONE
+                }
             }
         }
     }

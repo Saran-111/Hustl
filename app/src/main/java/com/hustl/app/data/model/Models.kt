@@ -1,20 +1,30 @@
 package com.hustl.app.data.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+import androidx.room.TypeConverter
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+
+@Entity(tableName = "users")
 data class User(
-    val userId: String = "",
+    @PrimaryKey val userId: String = "",
     val name: String = "",
     val email: String = "",
-    val role: String = "buyer", // "buyer" or "seller"
+    val password: String = "",
+    val role: String = "buyer",
     val bio: String = "",
     val profileImageUrl: String = "",
     val rating: Double = 0.0,
     val totalOrders: Int = 0,
     val location: String = "",
+    val walletBalance: Int = 0, // Added for Hustl Wallet
     val createdAt: Long = System.currentTimeMillis()
 )
 
+@Entity(tableName = "gigs")
 data class Gig(
-    val gigId: String = "",
+    @PrimaryKey val gigId: String = "",
     val sellerId: String = "",
     val sellerName: String = "",
     val sellerImageUrl: String = "",
@@ -31,7 +41,7 @@ data class Gig(
 )
 
 data class GigPackage(
-    val name: String = "",       // Basic / Standard / Premium
+    val name: String = "",
     val price: Int = 0,
     val description: String = "",
     val deliveryDays: Int = 3,
@@ -39,8 +49,9 @@ data class GigPackage(
     val features: List<String> = emptyList()
 )
 
+@Entity(tableName = "orders")
 data class Order(
-    val orderId: String = "",
+    @PrimaryKey val orderId: String = "",
     val gigId: String = "",
     val gigTitle: String = "",
     val buyerId: String = "",
@@ -48,15 +59,16 @@ data class Order(
     val sellerName: String = "",
     val packageName: String = "",
     val price: Int = 0,
-    val status: String = "pending", // pending / active / completed / cancelled
+    val status: String = "pending",
     val requirements: String = "",
     val progress: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val deliveryDate: Long = 0L
 )
 
+@Entity(tableName = "messages")
 data class Message(
-    val messageId: String = "",
+    @PrimaryKey val messageId: String = "",
     val chatId: String = "",
     val senderId: String = "",
     val senderName: String = "",
@@ -65,8 +77,9 @@ data class Message(
     val isRead: Boolean = false
 )
 
+@Entity(tableName = "chats")
 data class Chat(
-    val chatId: String = "",
+    @PrimaryKey val chatId: String = "",
     val participants: List<String> = emptyList(),
     val participantNames: Map<String, String> = emptyMap(),
     val gigId: String = "",
@@ -76,8 +89,9 @@ data class Chat(
     val unreadCount: Int = 0
 )
 
+@Entity(tableName = "reviews")
 data class Review(
-    val reviewId: String = "",
+    @PrimaryKey val reviewId: String = "",
     val gigId: String = "",
     val orderId: String = "",
     val buyerId: String = "",
@@ -86,3 +100,22 @@ data class Review(
     val comment: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
+
+class Converters {
+    private val gson = Gson()
+
+    @TypeConverter
+    fun fromStringList(value: List<String>): String = gson.toJson(value)
+    @TypeConverter
+    fun toStringList(value: String): List<String> = gson.fromJson(value, object : TypeToken<List<String>>() {}.type)
+
+    @TypeConverter
+    fun fromPackageList(value: List<GigPackage>): String = gson.toJson(value)
+    @TypeConverter
+    fun toPackageList(value: String): List<GigPackage> = gson.fromJson(value, object : TypeToken<List<GigPackage>>() {}.type)
+
+    @TypeConverter
+    fun fromStringMap(value: Map<String, String>): String = gson.toJson(value)
+    @TypeConverter
+    fun toStringMap(value: String): Map<String, String> = gson.fromJson(value, object : TypeToken<Map<String, String>>() {}.type)
+}

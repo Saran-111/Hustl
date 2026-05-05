@@ -6,6 +6,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.cardview.widget.CardView
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.hustl.app.R
 import com.hustl.app.data.model.Chat
@@ -21,9 +23,7 @@ import java.util.*
 class GigAdapter(
     private val isHorizontal: Boolean,
     private val onClick: (Gig) -> Unit
-) : RecyclerView.Adapter<GigAdapter.VH>() {
-
-    private var gigs = listOf<Gig>()
+) : ListAdapter<Gig, GigAdapter.VH>(GigDiffCallback()) {
 
     private val categoryColors = mapOf(
         "Design" to "#1a0533", "Development" to "#0d2233",
@@ -36,13 +36,6 @@ class GigAdapter(
         "Video" to "🎬", "Music" to "🎵"
     )
 
-    fun submitList(list: List<Gig>) {
-        gigs = list
-        notifyDataSetChanged()
-    }
-
-    override fun getItemCount() = gigs.size
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val layout = if (isHorizontal) R.layout.item_gig_horizontal else R.layout.item_gig_grid
         val v = LayoutInflater.from(parent.context).inflate(layout, parent, false)
@@ -50,7 +43,7 @@ class GigAdapter(
     }
 
     override fun onBindViewHolder(h: VH, pos: Int) {
-        val gig = gigs[pos]
+        val gig = getItem(pos)
         val color = categoryColors[gig.category] ?: "#1a1a1a"
         val emoji = categoryEmojis[gig.category] ?: "⚡"
 
@@ -60,11 +53,11 @@ class GigAdapter(
         h.tvSeller.text = gig.sellerName
         h.tvRating.text = "★ ${gig.rating} (${gig.reviewCount})"
         h.tvPrice.text = "₹${"%,d".format(gig.packages.minOfOrNull { it.price } ?: 0)}"
-        h.tvInitials.text = gig.sellerName.split(" ").take(2).joinToString("") { it.first().toString() }
+        h.tvInitials.text = gig.sellerName.split(" ").filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().toString() }
         h.itemView.setOnClickListener { onClick(gig) }
     }
 
-    inner class VH(v: View) : RecyclerView.ViewHolder(v) {
+    class VH(v: View) : RecyclerView.ViewHolder(v) {
         val tvEmoji: TextView? = v.findViewById(R.id.tvGigEmoji)
         val heroCard: CardView? = v.findViewById(R.id.cardHero)
         val tvTitle: TextView = v.findViewById(R.id.tvGigTitle)
@@ -72,6 +65,11 @@ class GigAdapter(
         val tvRating: TextView = v.findViewById(R.id.tvRating)
         val tvPrice: TextView = v.findViewById(R.id.tvPrice)
         val tvInitials: TextView = v.findViewById(R.id.tvSellerInitials)
+    }
+
+    class GigDiffCallback : DiffUtil.ItemCallback<Gig>() {
+        override fun areItemsTheSame(oldItem: Gig, newItem: Gig) = oldItem.gigId == newItem.gigId
+        override fun areContentsTheSame(oldItem: Gig, newItem: Gig) = oldItem == newItem
     }
 }
 
@@ -90,14 +88,14 @@ class SellerAdapter(private val sellers: List<Triple<String, String, Double>>) :
 
     override fun onBindViewHolder(h: VH, pos: Int) {
         val (name, skill, rating) = sellers[pos]
-        h.tvInitials.text = name.split(" ").take(2).joinToString("") { it.first().toString() }
+        h.tvInitials.text = name.split(" ").filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().toString() }
         h.tvName.text = name
         h.tvSkill.text = skill
         h.tvRating.text = "★ $rating"
         h.avatarCard.setCardBackgroundColor(Color.parseColor(bgColors[pos % bgColors.size]))
     }
 
-    inner class VH(v: View) : RecyclerView.ViewHolder(v) {
+    class VH(v: View) : RecyclerView.ViewHolder(v) {
         val tvInitials: TextView = v.findViewById(R.id.tvInitials)
         val tvName: TextView = v.findViewById(R.id.tvName)
         val tvSkill: TextView = v.findViewById(R.id.tvSkill)
@@ -145,7 +143,7 @@ class PackageAdapter(
         }
     }
 
-    inner class VH(v: View) : RecyclerView.ViewHolder(v) {
+    class VH(v: View) : RecyclerView.ViewHolder(v) {
         val card: com.google.android.material.card.MaterialCardView = v.findViewById(R.id.packageCard)
         val tvName: TextView = v.findViewById(R.id.tvPackageName)
         val tvPrice: TextView = v.findViewById(R.id.tvPackagePrice)
@@ -168,13 +166,13 @@ class ReviewAdapter(private val reviews: List<Review>) :
 
     override fun onBindViewHolder(h: VH, pos: Int) {
         val r = reviews[pos]
-        h.tvInitials.text = r.buyerName.split(" ").take(2).joinToString("") { it.first().toString() }
+        h.tvInitials.text = r.buyerName.split(" ").filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().toString() }
         h.tvName.text = r.buyerName
         h.tvStars.text = "★".repeat(r.rating.toInt())
         h.tvComment.text = r.comment
     }
 
-    inner class VH(v: View) : RecyclerView.ViewHolder(v) {
+    class VH(v: View) : RecyclerView.ViewHolder(v) {
         val tvInitials: TextView = v.findViewById(R.id.tvInitials)
         val tvName: TextView = v.findViewById(R.id.tvName)
         val tvStars: TextView = v.findViewById(R.id.tvStars)
@@ -225,7 +223,7 @@ class OrderAdapter(private var orders: List<Order>) :
         }
     }
 
-    inner class VH(v: View) : RecyclerView.ViewHolder(v) {
+    class VH(v: View) : RecyclerView.ViewHolder(v) {
         val tvOrderId: TextView = v.findViewById(R.id.tvOrderId)
         val tvTitle: TextView = v.findViewById(R.id.tvOrderTitle)
         val tvSeller: TextView = v.findViewById(R.id.tvOrderSeller)
@@ -239,6 +237,7 @@ class OrderAdapter(private var orders: List<Order>) :
 // ─── CHAT LIST ADAPTER ─────────────────────────────────────────────────────────
 class ChatListAdapter(
     private val chats: List<Chat>,
+    private val currentUserName: String,
     private val onClick: (Chat) -> Unit
 ) : RecyclerView.Adapter<ChatListAdapter.VH>() {
 
@@ -254,8 +253,8 @@ class ChatListAdapter(
 
     override fun onBindViewHolder(h: VH, pos: Int) {
         val c = chats[pos]
-        val otherName = c.participantNames.values.firstOrNull { it != "Arjun M." } ?: "Seller"
-        h.tvInitials.text = otherName.split(" ").take(2).joinToString("") { it.first().toString() }
+        val otherName = c.participantNames.values.firstOrNull { it != currentUserName } ?: "User"
+        h.tvInitials.text = otherName.split(" ").filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().toString() }
         h.tvName.text = otherName
         h.tvPreview.text = c.lastMessage
         h.tvTime.text = if (c.lastMessageTime > 0) sdf.format(Date(c.lastMessageTime)) else ""
@@ -264,7 +263,7 @@ class ChatListAdapter(
         h.itemView.setOnClickListener { onClick(c) }
     }
 
-    inner class VH(v: View) : RecyclerView.ViewHolder(v) {
+    class VH(v: View) : RecyclerView.ViewHolder(v) {
         val tvInitials: TextView = v.findViewById(R.id.tvInitials)
         val tvName: TextView = v.findViewById(R.id.tvName)
         val tvPreview: TextView = v.findViewById(R.id.tvPreview)
@@ -275,14 +274,13 @@ class ChatListAdapter(
 }
 
 // ─── MESSAGE ADAPTER ───────────────────────────────────────────────────────────
-class MessageAdapter(private val messages: List<Message>) :
-    RecyclerView.Adapter<MessageAdapter.VH>() {
+class MessageAdapter(
+    private val currentUserId: String
+) : ListAdapter<Message, MessageAdapter.VH>(MessageDiffCallback()) {
 
-    private val MY_ID = "user1"
     private val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
 
-    override fun getItemCount() = messages.size
-    override fun getItemViewType(pos: Int) = if (messages[pos].senderId == MY_ID) 1 else 0
+    override fun getItemViewType(pos: Int) = if (getItem(pos).senderId == currentUserId) 1 else 0
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val layout = if (viewType == 1) R.layout.item_message_sent else R.layout.item_message_recv
@@ -291,13 +289,18 @@ class MessageAdapter(private val messages: List<Message>) :
     }
 
     override fun onBindViewHolder(h: VH, pos: Int) {
-        val m = messages[pos]
+        val m = getItem(pos)
         h.tvText.text = m.text
         h.tvTime.text = sdf.format(Date(m.timestamp))
     }
 
-    inner class VH(v: View) : RecyclerView.ViewHolder(v) {
+    class VH(v: View) : RecyclerView.ViewHolder(v) {
         val tvText: TextView = v.findViewById(R.id.tvMessageText)
         val tvTime: TextView = v.findViewById(R.id.tvMessageTime)
+    }
+
+    class MessageDiffCallback : DiffUtil.ItemCallback<Message>() {
+        override fun areItemsTheSame(oldItem: Message, newItem: Message) = oldItem.messageId == newItem.messageId
+        override fun areContentsTheSame(oldItem: Message, newItem: Message) = oldItem == newItem
     }
 }

@@ -11,27 +11,35 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.hustl.app.adapters.PackageAdapter
 import com.hustl.app.adapters.ReviewAdapter
 import com.hustl.app.data.model.GigPackage
-import com.hustl.app.data.model.Order
+import com.hustl.app.data.repository.AuthRepository
 import com.hustl.app.data.repository.GigRepository
 import com.hustl.app.data.repository.OrderRepository
 import com.hustl.app.databinding.ActivityGigDetailBinding
 import com.hustl.app.databinding.BottomSheetOrderBinding
 import com.hustl.app.ui.chat.ChatActivity
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class GigDetailActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityGigDetailBinding
-    private val gigRepo = GigRepository()
-    private val orderRepo = OrderRepository()
+    private lateinit var gigRepo: GigRepository
+    private lateinit var orderRepo: OrderRepository
+    private lateinit var authRepo: AuthRepository
     private var selectedPackageIdx = 0
     private var gigId = ""
     private var isFaved = false
+    private var currentGigTitle = ""
+    private var currentSellerName = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityGigDetailBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        gigRepo = GigRepository(this)
+        orderRepo = OrderRepository(this)
+        authRepo = AuthRepository(this)
 
         gigId = intent.getStringExtra("gig_id") ?: ""
         loadGig()
@@ -43,17 +51,14 @@ class GigDetailActivity : AppCompatActivity() {
 
     private fun loadGig() {
         lifecycleScope.launch {
-            val gig = gigRepo.getSampleGigs().find { it.gigId == gigId }
-                ?: gigRepo.getSampleGigs().first()
+            val gig = gigRepo.getGigById(gigId) ?: gigRepo.getAllGigs().first().firstOrNull() ?: return@launch
+            
+            currentGigTitle = gig.title
+            currentSellerName = gig.sellerName
 
-            // Hero emoji/color
             val emojis = mapOf("Design" to "🎨", "Development" to "💻", "Writing" to "✍️",
                 "Marketing" to "📣", "Video" to "🎬", "Music" to "🎵")
             binding.tvGigEmoji.text = emojis[gig.category] ?: "⚡"
-
-            // Note: FrameLayout parent doesn't have an ID, using a workaround or just skipping color if not needed
-            // For now, let's just use the tvGigEmoji's parent if possible or ignore the background color change
-            // to avoid build errors if the view hierarchy isn't perfectly mapped.
 
             binding.tvCategory.text = gig.category
             binding.tvGigTitle.text = gig.title
@@ -62,9 +67,10 @@ class GigDetailActivity : AppCompatActivity() {
             binding.tvRating.text = "★ ${gig.rating}"
             binding.tvReviewCount.text = "${gig.reviewCount} reviews"
             binding.tvDescription.text = gig.description
-            binding.tvSellerInitials.text = gig.sellerName.split(" ").take(2).joinToString("") { it.first().toString() }
+            binding.tvSellerInitials.text = if (gig.sellerName.isNotEmpty()) {
+                gig.sellerName.split(" ").filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().toString() }
+            } else "S"
 
-            // Packages
             val pkgAdapter = PackageAdapter(gig.packages) { idx ->
                 selectedPackageIdx = idx
             }
@@ -74,8 +80,7 @@ class GigDetailActivity : AppCompatActivity() {
                 isNestedScrollingEnabled = false
             }
 
-            // Reviews
-            val reviews = gigRepo.getSampleReviews(gigId)
+            val reviews = gigRepo.getReviews(gigId)
             val reviewAdapter = ReviewAdapter(reviews)
             binding.rvReviews.apply {
                 layoutManager = LinearLayoutManager(this@GigDetailActivity)
@@ -84,7 +89,6 @@ class GigDetailActivity : AppCompatActivity() {
             }
             binding.tvReviewsHeader.text = "Reviews (${reviews.size})"
 
-            // Starting price
             val minPrice = gig.packages.minOfOrNull { it.price } ?: 0
             binding.tvStartingPrice.text = "From ₹${"%,d".format(minPrice)}"
 
@@ -105,40 +109,23 @@ class GigDetailActivity : AppCompatActivity() {
 
         sheetBinding.btnConfirmOrder.setOnClickListener {
             val requirements = sheetBinding.etRequirements.text.toString()
-            placeOrder(pkg, requirements)
+            
+            // Navigate to Payment module
+            val intent = Intent(this, PaymentActivity::class.java).apply {
+                putExtra("gig_id", gigId)
+                putExtra("gig_title", currentGigTitle)
+                putExtra("seller_name", currentSellerName)
+                putExtra("package_name", pkg.name)
+                putExtra("price", pkg.price)
+                putExtra("requirements", requirements)
+            }
+            startActivity(intent)
             dialog.dismiss()
         }
 
+        sheetBinding.btnCancel.setOnClickListener { dialog.dismiss() }
+
         dialog.show()
-    }
-
-    private fun placeOrder(pkg: GigPackage, requirements: String) {
-        val order = Order(
-            gigId = gigId,
-            gigTitle = binding.tvGigTitle.text.toString(),
-            buyerId = "user1",
-            sellerId = "seller1",
-            sellerName = binding.tvSellerName.text.toString(),
-            packageName = pkg.name,
-            price = pkg.price,
-            status = "pending",
-            requirements = requirements
-        )
-
-        lifecycleScope.launch {
-            val result = orderRepo.placeOrder(order)
-            result.fold(
-                onSuccess = { orderId ->
-                    val intent = Intent(this@GigDetailActivity, OrderSuccessActivity::class.java)
-                    intent.putExtra("order_id", "HU-$orderId")
-                    intent.putExtra("price", pkg.price)
-                    startActivity(intent)
-                },
-                onFailure = {
-                    Toast.makeText(this@GigDetailActivity, "Failed to place order", Toast.LENGTH_SHORT).show()
-                }
-            )
-        }
     }
 
     private fun toggleFav() {
@@ -153,7 +140,7 @@ class GigDetailActivity : AppCompatActivity() {
     private fun openChat() {
         val intent = Intent(this, ChatActivity::class.java)
         intent.putExtra("chat_id", "chat1")
-        intent.putExtra("other_name", binding.tvSellerName.text.toString())
+        intent.putExtra("other_name", currentSellerName)
         startActivity(intent)
     }
 }

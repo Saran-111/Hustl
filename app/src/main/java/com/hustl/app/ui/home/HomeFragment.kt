@@ -11,24 +11,35 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.chip.Chip
 import com.hustl.app.R
 import com.hustl.app.adapters.GigAdapter
 import com.hustl.app.adapters.SellerAdapter
 import com.hustl.app.data.model.Gig
+import com.hustl.app.data.repository.AuthRepository
 import com.hustl.app.data.repository.GigRepository
 import com.hustl.app.databinding.FragmentHomeBinding
 import com.hustl.app.ui.gigs.GigDetailActivity
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class HomeFragment : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
-    private val gigRepo = GigRepository()
+    private lateinit var gigRepo: GigRepository
+    private lateinit var authRepo: AuthRepository
     private var allGigs = listOf<Gig>()
     private lateinit var gridAdapter: GigAdapter
     private lateinit var featuredAdapter: GigAdapter
+    private var currentCategory = "All"
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        gigRepo = GigRepository(requireContext())
+        authRepo = AuthRepository(requireContext())
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
@@ -40,7 +51,32 @@ class HomeFragment : Fragment() {
         setupAdapters()
         setupSearch()
         setupCategories()
-        loadGigs()
+        observeGigs()
+        setupClickListeners()
+        updateUserProfile()
+    }
+
+    private fun updateUserProfile() {
+        val user = authRepo.currentUser
+        if (user != null) {
+            val firstName = user.name.split(" ").firstOrNull() ?: "there"
+            binding.tvGreeting.text = "Hello, $firstName! 👋"
+        }
+    }
+
+    private fun setupClickListeners() {
+        binding.btnProfile.setOnClickListener {
+            requireActivity().findViewById<BottomNavigationView>(R.id.bottom_nav).selectedItemId = R.id.nav_profile
+        }
+        
+        binding.btnExplore.setOnClickListener {
+            // Smooth scroll to the gigs section
+            binding.root.smoothScrollTo(0, binding.tvGridTitle.top)
+        }
+        
+        binding.tvSeeAll.setOnClickListener {
+            binding.root.smoothScrollTo(0, binding.tvGridTitle.top)
+        }
     }
 
     private fun setupAdapters() {
@@ -56,20 +92,34 @@ class HomeFragment : Fragment() {
             adapter = gridAdapter
             isNestedScrollingEnabled = false
         }
+    }
 
-        val sellerAdapter = SellerAdapter(gigRepo.getSampleGigs().take(5).map {
-            Triple(it.sellerName, it.category, it.rating)
-        })
-        binding.rvSellers.apply {
-            layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
-            adapter = sellerAdapter
+    private fun observeGigs() {
+        lifecycleScope.launch {
+            gigRepo.getAllGigs().collectLatest { gigs ->
+                allGigs = gigs
+                updateFeatured(gigs)
+                applyFilters()
+                
+                val sellers = gigs.distinctBy { it.sellerId }.take(5).map {
+                    Triple(it.sellerName, it.category, it.rating)
+                }
+                binding.rvSellers.apply {
+                    layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
+                    adapter = SellerAdapter(sellers)
+                }
+            }
         }
+    }
+
+    private fun updateFeatured(gigs: List<Gig>) {
+        featuredAdapter.submitList(gigs.filter { it.rating >= 4.8 }.sortedByDescending { it.createdAt }.take(5))
     }
 
     private fun setupSearch() {
         binding.etSearch.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
-                filterGigs(s.toString())
+                applyFilters()
             }
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -78,45 +128,32 @@ class HomeFragment : Fragment() {
 
     private fun setupCategories() {
         val categories = listOf("All", "Design", "Development", "Writing", "Marketing", "Video", "Music")
+        binding.chipGroupCategories.removeAllViews()
         categories.forEach { cat ->
             val chip = Chip(requireContext()).apply {
                 text = cat
                 isCheckable = true
-                isChecked = cat == "All"
+                isChecked = cat == currentCategory
                 setChipBackgroundColorResource(R.color.chip_selector)
                 setTextColor(resources.getColorStateList(R.color.chip_text_selector, null))
-                setOnClickListener { filterByCategory(cat) }
+                setOnClickListener { 
+                    currentCategory = cat
+                    applyFilters()
+                }
             }
             binding.chipGroupCategories.addView(chip)
         }
     }
 
-    private fun loadGigs() {
-        lifecycleScope.launch {
-            allGigs = gigRepo.getSampleGigs()
-            featuredAdapter.submitList(allGigs.take(5))
-            gridAdapter.submitList(allGigs)
-            binding.tvGigCount.text = "${allGigs.size} gigs"
-        }
-    }
-
-    private fun filterByCategory(category: String) {
-        val filtered = if (category == "All") allGigs
-        else allGigs.filter { it.category == category }
-        gridAdapter.submitList(filtered)
-        binding.tvGigCount.text = "${filtered.size} gigs"
-        binding.tvGridTitle.text = if (category == "All") "All Gigs" else category
-    }
-
-    private fun filterGigs(query: String) {
-        val filtered = if (query.isEmpty()) allGigs
-        else allGigs.filter {
-            it.title.contains(query, ignoreCase = true) ||
-            it.category.contains(query, ignoreCase = true) ||
-            it.sellerName.contains(query, ignoreCase = true)
+    private fun applyFilters() {
+        val query = binding.etSearch.text.toString()
+        val filtered = allGigs.filter { gig ->
+            (currentCategory == "All" || gig.category == currentCategory) &&
+            (query.isEmpty() || gig.title.contains(query, ignoreCase = true) || gig.sellerName.contains(query, ignoreCase = true))
         }
         gridAdapter.submitList(filtered)
-        binding.tvGigCount.text = "${filtered.size} gigs"
+        binding.tvGigCount.text = "${filtered.size} gigs found"
+        binding.tvGridTitle.text = if (currentCategory == "All") "All Gigs" else "$currentCategory Gigs"
     }
 
     private fun openGig(gig: Gig) {

@@ -14,12 +14,14 @@ import kotlinx.coroutines.launch
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
-    private val authRepo = AuthRepository()
+    private lateinit var authRepo: AuthRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        
+        authRepo = AuthRepository(this)
 
         binding.btnLogin.setOnClickListener { doLogin() }
 

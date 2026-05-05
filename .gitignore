@@ -1,0 +1,36 @@
+gitignore
+# Build artifacts
+build/
+app/build/
+bin/
+gen/
+out/
+.gradle/
+
+# Local configuration files
+local.properties
+
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Log files
+*.log
+
+# Android
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Keystore files
+*.jks
+*.keystore
+
+# Google Services
+# google-services.json
+
+# System Files
+.DS_Store
+Thumbs.db

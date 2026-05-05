@@ -1,3 +1,0 @@
-com.hustl.app.test
-style WhiteBackgroundDialogTheme
-style WhiteBackgroundTheme

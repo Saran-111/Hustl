@@ -1,6 +1,0 @@
-com.hustl.app.test.app-androidTest-0 C:\Hustl-AndroidProject\Hustl\app\build\generated\res\resValues\androidTest\debug
-com.hustl.app.test.app-mergeDebugAndroidTestResources-1 C:\Hustl-AndroidProject\Hustl\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\merged.dir
-com.hustl.app.test.app-mergeDebugAndroidTestResources-2 C:\Hustl-AndroidProject\Hustl\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\stripped.dir
-com.hustl.app.test.app-merged_res-3 C:\Hustl-AndroidProject\Hustl\app\build\intermediates\merged_res\debugAndroidTest
-com.hustl.app.test.app-jetified-annotation-experimental-1.3.0-4 C:\Users\25mx219\.gradle\caches\transforms-3\2cb920e16e653b696ef8dcc2acaaf955\transformed\jetified-annotation-experimental-1.3.0\res
-com.hustl.app.test.app-jetified-core-1.5.0-5 C:\Users\25mx219\.gradle\caches\transforms-3\d4ead0faa74545d27596741aad619a6c\transformed\jetified-core-1.5.0\res

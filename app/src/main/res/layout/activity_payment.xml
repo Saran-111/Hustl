@@ -150,16 +150,6 @@
                     android:paddingHorizontal="16dp"
                     android:layout_marginBottom="8dp"
                     android:buttonTint="@color/accent"/>
-
-                <RadioButton
-                    android:id="@+id/rbWallet"
-                    android:layout_width="match_parent"
-                    android:layout_height="64dp"
-                    android:text="Hustl Wallet (Balance: ₹0)"
-                    android:textColor="@color/text_primary"
-                    android:background="@drawable/bg_card"
-                    android:paddingHorizontal="16dp"
-                    android:buttonTint="@color/accent"/>
             </RadioGroup>
 
             <com.google.android.material.textfield.TextInputLayout
@@ -261,6 +251,7 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
+    <!-- Auth overlay retained for future use (kept gone by default) -->
     <FrameLayout
         android:id="@+id/authOverlay"
         android:layout_width="match_parent"

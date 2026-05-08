@@ -1,103 +1,153 @@
 package com.hustl.app.data.repository
 
 import android.content.Context
-import com.hustl.app.data.local.AppDatabase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.hustl.app.data.model.User
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.hustl.app.data.model.toFirestoreMap
+import kotlinx.coroutines.tasks.await
 
 class AuthRepository(context: Context) {
-    private val userDao = AppDatabase.getDatabase(context).userDao()
-    private val prefs = context.getSharedPreferences("hustl_prefs", Context.MODE_PRIVATE)
-    
+
+    private val auth = FirebaseAuth.getInstance()
+    private val db = FirebaseFirestore.getInstance()
+
     companion object {
-        private var cachedUser: User? = null
+        @Volatile private var cachedUser: User? = null
     }
 
     val currentUser: User? get() = cachedUser
 
-    suspend fun login(email: String, password: String): Result<User> = withContext(Dispatchers.IO) {
-        try {
-            val user = userDao.getUserByEmail(email)
-            if (user != null && user.password == password) {
-                persistLogin(user)
-                Result.success(user)
-            } else {
-                Result.failure(Exception("Invalid email or password"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
+    fun isHustlr(): Boolean = cachedUser?.role == "hustlr"
 
-    suspend fun register(name: String, email: String, password: String, role: String): Result<User> = withContext(Dispatchers.IO) {
-        try {
-            val existingUser = userDao.getUserByEmail(email)
-            if (existingUser != null) {
-                return@withContext Result.failure(Exception("Email already registered"))
-            }
-            
-            val uid = "user_${System.currentTimeMillis()}"
-            val user = User(
-                userId = uid, 
-                name = name, 
-                email = email, 
-                password = password, 
-                role = role,
-                location = "Mumbai, India",
-                rating = 4.5,
-                walletBalance = 500 // Start with some demo credits
-            )
-            userDao.insertUser(user)
-            persistLogin(user)
+    // ─── Login ────────────────────────────────────────────────────────────────
+
+    suspend fun login(email: String, password: String): Result<User> {
+        return try {
+            val result = auth.signInWithEmailAndPassword(email, password).await()
+            val uid = result.user?.uid ?: throw Exception("Authentication failed")
+            val user = loadAndCacheUser(uid) ?: throw Exception("Profile not found. Please register again.")
             Result.success(user)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(mapFirebaseError(e)))
         }
     }
 
-    private fun persistLogin(user: User) {
-        cachedUser = user
-        prefs.edit().putString("logged_in_uid", user.userId).apply()
-    }
+    // ─── Register ─────────────────────────────────────────────────────────────
 
-    suspend fun checkSession(): Boolean = withContext(Dispatchers.IO) {
-        val uid = prefs.getString("logged_in_uid", null)
-        if (uid != null) {
-            val user = userDao.getUserById(uid)
-            if (user != null) {
-                cachedUser = user
-                return@withContext true
-            }
+    suspend fun register(name: String, email: String, password: String, role: String): Result<User> {
+        return try {
+            val result = auth.createUserWithEmailAndPassword(email, password).await()
+            val uid = result.user?.uid ?: throw Exception("Registration failed")
+
+            val user = User(
+                userId = uid,
+                name = name,
+                email = email,
+                role = role,
+                createdAt = System.currentTimeMillis()
+            )
+
+            db.collection("users").document(uid).set(user.toFirestoreMap()).await()
+            cachedUser = user
+            Result.success(user)
+        } catch (e: Exception) {
+            Result.failure(Exception(mapFirebaseError(e)))
         }
-        false
     }
 
-    suspend fun getUserProfile(uid: String): User = withContext(Dispatchers.IO) {
-        userDao.getUserById(uid) ?: User()
+    // ─── Password Reset ───────────────────────────────────────────────────────
+
+    suspend fun sendPasswordReset(email: String): Result<Unit> {
+        return try {
+            auth.sendPasswordResetEmail(email).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(Exception(mapFirebaseError(e)))
+        }
     }
 
-    suspend fun updateWalletBalance(amount: Int): Boolean = withContext(Dispatchers.IO) {
-        val user = cachedUser ?: return@withContext false
-        val updatedUser = user.copy(walletBalance = user.walletBalance + amount)
-        userDao.updateUser(updatedUser)
-        cachedUser = updatedUser
-        true
+    // ─── Session ──────────────────────────────────────────────────────────────
+
+    suspend fun checkSession(): Boolean {
+        val firebaseUser = auth.currentUser ?: return false
+        return try {
+            loadAndCacheUser(firebaseUser.uid) != null
+        } catch (e: Exception) {
+            false
+        }
     }
 
-    suspend fun deductWalletBalance(amount: Int): Boolean = withContext(Dispatchers.IO) {
-        val user = cachedUser ?: return@withContext false
-        if (user.walletBalance < amount) return@withContext false
-        val updatedUser = user.copy(walletBalance = user.walletBalance - amount)
-        userDao.updateUser(updatedUser)
-        cachedUser = updatedUser
-        true
+    // ─── Profile ─────────────────────────────────────────────────────────────
+
+    suspend fun getUserProfile(uid: String): User {
+        return loadAndCacheUser(uid) ?: User()
+    }
+
+    suspend fun updateFcmToken(uid: String, token: String) {
+        try {
+            db.collection("users").document(uid)
+                .update("fcmToken", token)
+                .await()
+        } catch (_: Exception) {}
+    }
+
+    suspend fun updateOnlineStatus(uid: String, online: Boolean) {
+        try {
+            db.collection("users").document(uid)
+                .update(mapOf("isOnline" to online, "lastActive" to System.currentTimeMillis()))
+                .await()
+        } catch (_: Exception) {}
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    private suspend fun loadAndCacheUser(uid: String): User? {
+        val doc = db.collection("users").document(uid).get().await()
+        if (!doc.exists()) return null
+        val user = User(
+            userId = doc.getString("userId") ?: uid,
+            name = doc.getString("name") ?: "",
+            email = doc.getString("email") ?: "",
+            role = doc.getString("role") ?: "buyer",
+            bio = doc.getString("bio") ?: "",
+            profileImageUrl = doc.getString("profileImageUrl") ?: "",
+            fcmToken = doc.getString("fcmToken") ?: "",
+            rating = doc.getDouble("rating") ?: 0.0,
+            reviewCount = (doc.getLong("reviewCount") ?: 0L).toInt(),
+            totalOrders = (doc.getLong("totalOrders") ?: 0L).toInt(),
+            location = doc.getString("location") ?: "",
+            isOnline = doc.getBoolean("isOnline") ?: false,
+            createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
+        )
+        if (auth.currentUser?.uid == user.userId) {
+            cachedUser = user
+        }
+        return user
+    }
+
+    private fun mapFirebaseError(e: Exception): String {
+        val msg = e.message ?: return "Something went wrong"
+        return when {
+            msg.contains("INVALID_LOGIN_CREDENTIALS") ||
+            msg.contains("wrong-password") ||
+            msg.contains("user-not-found") -> "Invalid email or password"
+            msg.contains("email-already-in-use") ||
+            msg.contains("EMAIL_EXISTS") -> "This email is already registered"
+            msg.contains("weak-password") -> "Password must be at least 6 characters"
+            msg.contains("invalid-email") ||
+            msg.contains("INVALID_EMAIL") -> "Invalid email address"
+            msg.contains("network") ||
+            msg.contains("NETWORK") -> "No internet connection"
+            msg.contains("too-many-requests") -> "Too many attempts. Try again later."
+            else -> msg
+        }
     }
 
     fun logout() {
+        auth.signOut()
         cachedUser = null
-        prefs.edit().remove("logged_in_uid").apply()
     }
 
-    fun isLoggedIn() = cachedUser != null
+    fun isLoggedIn() = auth.currentUser != null
 }

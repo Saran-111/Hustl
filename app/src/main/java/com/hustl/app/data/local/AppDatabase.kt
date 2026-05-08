@@ -10,9 +10,6 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE userId = :uid")
     suspend fun getUserById(uid: String): User?
 
-    @Query("SELECT * FROM users WHERE email = :email LIMIT 1")
-    suspend fun getUserByEmail(email: String): User?
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUser(user: User)
 
@@ -22,29 +19,41 @@ interface UserDao {
 
 @Dao
 interface GigDao {
-    @Query("SELECT * FROM gigs")
+    @Query("SELECT * FROM gigs WHERE isActive = 1 ORDER BY createdAt DESC")
     fun getAllGigs(): Flow<List<Gig>>
 
-    @Query("SELECT * FROM gigs WHERE category = :category")
+    @Query("SELECT * FROM gigs WHERE isActive = 1 AND category = :category ORDER BY createdAt DESC")
     fun getGigsByCategory(category: String): Flow<List<Gig>>
 
     @Query("SELECT * FROM gigs WHERE gigId = :id")
     suspend fun getGigById(id: String): Gig?
 
+    @Query("SELECT * FROM gigs WHERE sellerId = :sellerId AND isActive = 1")
+    fun getGigsBySeller(sellerId: String): Flow<List<Gig>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertGigs(gigs: List<Gig>)
+
+    @Query("DELETE FROM gigs")
+    suspend fun clearAll()
 }
 
 @Dao
 interface OrderDao {
-    @Query("SELECT * FROM orders WHERE buyerId = :uid OR sellerId = :uid")
+    @Query("SELECT * FROM orders WHERE buyerId = :uid OR sellerId = :uid ORDER BY createdAt DESC")
     fun getOrdersForUser(uid: String): Flow<List<Order>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrder(order: Order)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrders(orders: List<Order>)
+
     @Update
     suspend fun updateOrder(order: Order)
+
+    @Query("DELETE FROM orders")
+    suspend fun clearAll()
 }
 
 @Dao
@@ -60,6 +69,9 @@ interface ChatDao {
 
     @Update
     suspend fun updateChat(chat: Chat)
+
+    @Query("DELETE FROM chats")
+    suspend fun clearAll()
 }
 
 @Dao
@@ -69,9 +81,16 @@ interface MessageDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: Message)
+
+    @Query("DELETE FROM messages WHERE chatId = :chatId")
+    suspend fun clearMessagesForChat(chatId: String)
 }
 
-@Database(entities = [User::class, Gig::class, Order::class, Chat::class, Message::class, Review::class], version = 1)
+@Database(
+    entities = [User::class, Gig::class, Order::class, Chat::class, Message::class, Review::class],
+    version = 2,
+    exportSchema = false
+)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
@@ -81,8 +100,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun messageDao(): MessageDao
 
     companion object {
-        @Volatile
-        private var INSTANCE: AppDatabase? = null
+        @Volatile private var INSTANCE: AppDatabase? = null
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -90,7 +108,10 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "hustl_database"
-                ).build()
+                )
+                // Safe to destructively migrate — DB is now just a cache, Firestore is source of truth
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }

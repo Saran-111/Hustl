@@ -12,7 +12,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.hustl.app.R
 import com.hustl.app.data.model.Chat
 import com.hustl.app.data.model.Gig
-import com.hustl.app.data.model.GigPackage
 import com.hustl.app.data.model.Message
 import com.hustl.app.data.model.Order
 import com.hustl.app.data.model.Review
@@ -52,7 +51,7 @@ class GigAdapter(
         h.tvTitle.text = gig.title
         h.tvSeller.text = gig.sellerName
         h.tvRating.text = "★ ${gig.rating} (${gig.reviewCount})"
-        h.tvPrice.text = "₹${"%,d".format(gig.packages.minOfOrNull { it.price } ?: 0)}"
+        h.tvPrice.text = "₹${"%,d".format(gig.minPrice)}"
         h.tvInitials.text = gig.sellerName.split(" ").filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().toString() }
         h.itemView.setOnClickListener { onClick(gig) }
     }
@@ -104,54 +103,6 @@ class SellerAdapter(private val sellers: List<Triple<String, String, Double>>) :
     }
 }
 
-// ─── PACKAGE ADAPTER ───────────────────────────────────────────────────────────
-class PackageAdapter(
-    private val packages: List<GigPackage>,
-    private val onSelected: (Int) -> Unit
-) : RecyclerView.Adapter<PackageAdapter.VH>() {
-
-    private var selectedIdx = 0
-
-    override fun getItemCount() = packages.size
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val v = LayoutInflater.from(parent.context).inflate(R.layout.item_package, parent, false)
-        return VH(v)
-    }
-
-    override fun onBindViewHolder(h: VH, pos: Int) {
-        val pkg = packages[pos]
-        h.tvName.text = pkg.name
-        h.tvPrice.text = "₹${"%,d".format(pkg.price)}"
-        h.tvDesc.text = pkg.description
-        h.tvDelivery.text = "Delivered in ${pkg.deliveryDays} days · ${if (pkg.revisions == -1) "Unlimited" else pkg.revisions.toString()} revisions"
-        h.tvFeatures.text = pkg.features.joinToString("\n") { "✓  $it" }
-
-        val isSelected = pos == selectedIdx
-        h.card.setCardBackgroundColor(
-            if (isSelected) Color.parseColor("#1a1a00") else Color.parseColor("#161616")
-        )
-        h.card.strokeColor = if (isSelected) Color.parseColor("#e8ff6b") else Color.parseColor("#2a2a2a")
-        h.card.strokeWidth = if (isSelected) 3 else 1
-
-        h.card.setOnClickListener {
-            val old = selectedIdx
-            selectedIdx = pos
-            notifyItemChanged(old)
-            notifyItemChanged(pos)
-            onSelected(pos)
-        }
-    }
-
-    class VH(v: View) : RecyclerView.ViewHolder(v) {
-        val card: com.google.android.material.card.MaterialCardView = v.findViewById(R.id.packageCard)
-        val tvName: TextView = v.findViewById(R.id.tvPackageName)
-        val tvPrice: TextView = v.findViewById(R.id.tvPackagePrice)
-        val tvDesc: TextView = v.findViewById(R.id.tvPackageDesc)
-        val tvDelivery: TextView = v.findViewById(R.id.tvDelivery)
-        val tvFeatures: TextView = v.findViewById(R.id.tvFeatures)
-    }
-}
 
 // ─── REVIEW ADAPTER ────────────────────────────────────────────────────────────
 class ReviewAdapter(private val reviews: List<Review>) :
@@ -181,7 +132,11 @@ class ReviewAdapter(private val reviews: List<Review>) :
 }
 
 // ─── ORDER ADAPTER ─────────────────────────────────────────────────────────────
-class OrderAdapter(private var orders: List<Order>) :
+class OrderAdapter(
+    private val currentUserId: String,
+    private var orders: List<Order>,
+    private val onOrderClick: (Order, String) -> Unit
+) :
     RecyclerView.Adapter<OrderAdapter.VH>() {
 
     fun updateList(newList: List<Order>) {
@@ -200,26 +155,88 @@ class OrderAdapter(private var orders: List<Order>) :
         val o = orders[pos]
         h.tvOrderId.text = "#${o.orderId}"
         h.tvTitle.text = o.gigTitle
-        h.tvSeller.text = "Seller: ${o.sellerName}"
+        h.tvSeller.text = "Hustlr: ${o.sellerName}"
         h.tvPrice.text = "₹${"%,d".format(o.price)}"
 
         val (statusText, statusColor) = when (o.status) {
             "active" -> "Active" to "#6bffc8"
+            "under_review" -> "In Review" to "#fb923c"
             "completed" -> "Completed" to "#e8ff6b"
+            "cancelled" -> "Cancelled" to "#ff4d4d"
             "pending" -> "Pending" to "#fb923c"
             else -> "Unknown" to "#9a9590"
         }
         h.tvStatus.text = statusText
         h.tvStatus.setTextColor(Color.parseColor(statusColor))
 
-        if (o.status == "active") {
-            h.progressBar.visibility = View.VISIBLE
-            h.progressBar.progress = o.progress
-            h.tvProgress.visibility = View.VISIBLE
-            h.tvProgress.text = "${o.progress}% complete"
-        } else {
-            h.progressBar.visibility = View.GONE
-            h.tvProgress.visibility = View.GONE
+        h.progressBar.visibility = View.GONE
+        h.layoutActions.visibility = View.GONE
+        h.btnPrimaryAction.visibility = View.GONE
+        h.btnSecondaryAction.visibility = View.GONE
+        h.tvRevisionNote.visibility = View.GONE
+
+        if (o.revisionNote.isNotEmpty()) {
+            h.tvRevisionNote.visibility = View.VISIBLE
+            h.tvRevisionNote.text = "Revision Note: ${o.revisionNote}"
+        }
+
+        val isSeller = o.sellerId == currentUserId
+
+        when (o.status) {
+            "active" -> {
+                h.progressBar.visibility = View.VISIBLE
+                h.progressBar.progress = o.progress
+                h.layoutActions.visibility = View.VISIBLE
+                h.btnPrimaryAction.visibility = View.VISIBLE
+                h.btnSecondaryAction.visibility = View.VISIBLE
+                h.btnSecondaryAction.text = "Cancel Order"
+                h.btnSecondaryAction.setOnClickListener { onOrderClick(o, "cancel") }
+
+                if (isSeller) {
+                    h.btnPrimaryAction.text = "Mark for Review"
+                    h.btnPrimaryAction.setOnClickListener { onOrderClick(o, "mark_review") }
+                } else {
+                    h.btnPrimaryAction.text = "Order is Active"
+                    h.btnPrimaryAction.setBackgroundResource(R.drawable.bg_btn_outline)
+                    h.btnPrimaryAction.setTextColor(Color.parseColor("#9a9590"))
+                    h.btnPrimaryAction.setOnClickListener(null)
+                }
+            }
+            "under_review" -> {
+                h.layoutActions.visibility = View.VISIBLE
+                h.btnPrimaryAction.visibility = View.VISIBLE
+                if (isSeller) {
+                    h.btnPrimaryAction.text = "Waiting for Buyer"
+                    h.btnPrimaryAction.setBackgroundResource(R.drawable.bg_btn_outline)
+                    h.btnPrimaryAction.setTextColor(Color.parseColor("#9a9590"))
+                    h.btnPrimaryAction.setOnClickListener(null)
+                } else {
+                    h.btnPrimaryAction.text = "Verify & Complete"
+                    h.btnPrimaryAction.setBackgroundResource(R.drawable.bg_btn_accent)
+                    h.btnPrimaryAction.setTextColor(Color.parseColor("#1a1a1a"))
+                    h.btnPrimaryAction.setOnClickListener { onOrderClick(o, "verify") }
+
+                    h.btnSecondaryAction.visibility = View.VISIBLE
+                    h.btnSecondaryAction.text = "Request Revision"
+                    h.btnSecondaryAction.setOnClickListener { onOrderClick(o, "revision") }
+                }
+            }
+            "completed" -> {
+                h.layoutActions.visibility = View.VISIBLE
+                h.btnPrimaryAction.visibility = View.VISIBLE
+                if (isSeller) {
+                    h.btnPrimaryAction.text = "✓ Completed"
+                    h.btnPrimaryAction.setBackgroundResource(R.drawable.bg_btn_outline)
+                    h.btnPrimaryAction.setTextColor(Color.parseColor("#e8ff6b"))
+                    h.btnPrimaryAction.setOnClickListener(null)
+                } else {
+                    h.btnPrimaryAction.text = "Leave a Review"
+                    h.btnPrimaryAction.setBackgroundResource(R.drawable.bg_btn_outline)
+                    h.btnPrimaryAction.setTextColor(Color.parseColor("#ffffff"))
+                    // Review logic handled in detail view or separate flow
+                    h.btnPrimaryAction.setOnClickListener(null)
+                }
+            }
         }
     }
 
@@ -230,7 +247,10 @@ class OrderAdapter(private var orders: List<Order>) :
         val tvPrice: TextView = v.findViewById(R.id.tvOrderPrice)
         val tvStatus: TextView = v.findViewById(R.id.tvOrderStatus)
         val progressBar: android.widget.ProgressBar = v.findViewById(R.id.progressBar)
-        val tvProgress: TextView = v.findViewById(R.id.tvProgress)
+        val layoutActions: View = v.findViewById(R.id.layoutActions)
+        val btnPrimaryAction: TextView = v.findViewById(R.id.btnPrimaryAction)
+        val btnSecondaryAction: TextView = v.findViewById(R.id.btnSecondaryAction)
+        val tvRevisionNote: TextView = v.findViewById(R.id.tvRevisionNote)
     }
 }
 
@@ -302,5 +322,39 @@ class MessageAdapter(
     class MessageDiffCallback : DiffUtil.ItemCallback<Message>() {
         override fun areItemsTheSame(oldItem: Message, newItem: Message) = oldItem.messageId == newItem.messageId
         override fun areContentsTheSame(oldItem: Message, newItem: Message) = oldItem == newItem
+    }
+}
+
+// ─── NOTIFICATION ADAPTER ──────────────────────────────────────────────────────
+class NotificationAdapter(
+    private val notifications: List<com.hustl.app.data.repository.HustlNotification>
+) : RecyclerView.Adapter<NotificationAdapter.VH>() {
+
+    override fun getItemCount() = notifications.size
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+        val v = LayoutInflater.from(parent.context).inflate(R.layout.item_notification, parent, false)
+        return VH(v)
+    }
+
+    override fun onBindViewHolder(h: VH, pos: Int) {
+        val n = notifications[pos]
+        h.tvTitle.text = n.title
+        h.tvBody.text = n.body
+        h.tvIcon.text = when (n.type) {
+            "order" -> "📦"
+            "review" -> "⭐"
+            else -> "🔔"
+        }
+        
+        val sdf = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
+        h.tvTime.text = sdf.format(Date(n.timestamp))
+    }
+
+    class VH(v: View) : RecyclerView.ViewHolder(v) {
+        val tvIcon: TextView = v.findViewById(R.id.tvIcon)
+        val tvTitle: TextView = v.findViewById(R.id.tvTitle)
+        val tvBody: TextView = v.findViewById(R.id.tvBody)
+        val tvTime: TextView = v.findViewById(R.id.tvTime)
     }
 }

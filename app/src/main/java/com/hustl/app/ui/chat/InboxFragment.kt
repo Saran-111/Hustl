@@ -41,7 +41,7 @@ class InboxFragment : Fragment() {
     private fun observeChats() {
         val currentUser = authRepo.currentUser
         val currentUserName = currentUser?.name ?: "User"
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             chatRepo.getMyChats(currentUser?.userId ?: "user1").collectLatest { chats ->
                 val adapter = ChatListAdapter(chats, currentUserName) { chat ->
                     val intent = Intent(requireContext(), ChatActivity::class.java)

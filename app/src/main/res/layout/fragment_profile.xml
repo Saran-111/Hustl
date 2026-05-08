@@ -107,7 +107,7 @@
 
         </LinearLayout>
 
-        <!-- Earnings/Balance Card -->
+        <!-- Earnings Card (hustlr) / Spending Card (buyer) -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -148,6 +148,20 @@
             android:orientation="vertical"
             android:paddingHorizontal="20dp">
 
+            <LinearLayout android:id="@+id/menuViewProfile" android:layout_width="match_parent"
+                android:layout_height="56dp" android:orientation="horizontal"
+                android:gravity="center_vertical" android:background="@drawable/bg_card"
+                android:paddingHorizontal="16dp" android:layout_marginBottom="8dp"
+                android:visibility="gone">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="👤" android:textSize="18sp" android:layout_marginEnd="14dp"/>
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:text="View My Public Profile" android:textSize="14sp"
+                    android:textStyle="bold" android:textColor="@color/text_primary"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="›" android:textSize="20sp" android:textColor="@color/text_secondary"/>
+            </LinearLayout>
+
             <LinearLayout android:id="@+id/menuOrders" android:layout_width="match_parent"
                 android:layout_height="56dp" android:orientation="horizontal"
                 android:gravity="center_vertical" android:background="@drawable/bg_card"
@@ -161,19 +175,7 @@
                     android:text="›" android:textSize="20sp" android:textColor="@color/text_secondary"/>
             </LinearLayout>
 
-            <LinearLayout android:id="@+id/menuCreateGig" android:layout_width="match_parent"
-                android:layout_height="56dp" android:orientation="horizontal"
-                android:gravity="center_vertical" android:background="@drawable/bg_card"
-                android:paddingHorizontal="16dp" android:layout_marginBottom="8dp">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:text="✨" android:textSize="18sp" android:layout_marginEnd="14dp"/>
-                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                    android:layout_weight="1" android:text="Become a Seller" android:textSize="14sp"
-                    android:textStyle="bold" android:textColor="@color/text_primary"/>
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:text="›" android:textSize="20sp" android:textColor="@color/text_secondary"/>
-            </LinearLayout>
-
+            <!-- Saved Gigs (both roles) -->
             <LinearLayout android:id="@+id/menuSaved" android:layout_width="match_parent"
                 android:layout_height="56dp" android:orientation="horizontal"
                 android:gravity="center_vertical" android:background="@drawable/bg_card"
@@ -182,19 +184,6 @@
                     android:text="🔖" android:textSize="18sp" android:layout_marginEnd="14dp"/>
                 <TextView android:layout_width="0dp" android:layout_height="wrap_content"
                     android:layout_weight="1" android:text="Saved Gigs" android:textSize="14sp"
-                    android:textStyle="bold" android:textColor="@color/text_primary"/>
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:text="›" android:textSize="20sp" android:textColor="@color/text_secondary"/>
-            </LinearLayout>
-
-            <LinearLayout android:id="@+id/menuPayments" android:layout_width="match_parent"
-                android:layout_height="56dp" android:orientation="horizontal"
-                android:gravity="center_vertical" android:background="@drawable/bg_card"
-                android:paddingHorizontal="16dp" android:layout_marginBottom="8dp">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:text="💳" android:textSize="18sp" android:layout_marginEnd="14dp"/>
-                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                    android:layout_weight="1" android:text="Payment Methods" android:textSize="14sp"
                     android:textStyle="bold" android:textColor="@color/text_primary"/>
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="›" android:textSize="20sp" android:textColor="@color/text_secondary"/>

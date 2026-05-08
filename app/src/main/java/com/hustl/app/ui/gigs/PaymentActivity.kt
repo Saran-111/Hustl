@@ -21,10 +21,7 @@ class PaymentActivity : AppCompatActivity() {
     private lateinit var binding: ActivityPaymentBinding
     private lateinit var orderRepo: OrderRepository
     private lateinit var authRepo: AuthRepository
-    private var walletBalance = 0
     private var generatedKey: String? = null
-
-    // Pending order details to use after authentication
     private var pendingOrderData: Bundle? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,12 +33,12 @@ class PaymentActivity : AppCompatActivity() {
         authRepo = AuthRepository(this)
 
         setupPaymentMethods()
-        loadWalletBalance()
         setupWebView()
 
         val gigId = intent.getStringExtra("gig_id") ?: ""
         val gigTitle = intent.getStringExtra("gig_title") ?: ""
         val sellerName = intent.getStringExtra("seller_name") ?: ""
+        val sellerId = intent.getStringExtra("seller_id") ?: ""
         val packageName = intent.getStringExtra("package_name") ?: ""
         val price = intent.getIntExtra("price", 0)
         val requirements = intent.getStringExtra("requirements") ?: ""
@@ -54,7 +51,7 @@ class PaymentActivity : AppCompatActivity() {
 
         binding.btnPay.setOnClickListener {
             if (validateInputs(price)) {
-                startAuthentication(gigId, gigTitle, sellerName, packageName, price, requirements)
+                startAuthentication(gigId, gigTitle, sellerName, sellerId, packageName, price, requirements)
             }
         }
     }
@@ -78,21 +75,6 @@ class PaymentActivity : AppCompatActivity() {
                     binding.layoutUpi.visibility = View.GONE
                     binding.layoutCard.visibility = View.VISIBLE
                 }
-                binding.rbWallet.id -> {
-                    binding.layoutUpi.visibility = View.GONE
-                    binding.layoutCard.visibility = View.GONE
-                }
-            }
-        }
-    }
-
-    private fun loadWalletBalance() {
-        val currentUser = authRepo.currentUser
-        if (currentUser != null) {
-            lifecycleScope.launch {
-                val user = authRepo.getUserProfile(currentUser.userId)
-                walletBalance = user.walletBalance
-                binding.rbWallet.text = "Hustl Wallet (Balance: ₹${"%,d".format(walletBalance)})"
             }
         }
     }
@@ -110,22 +92,21 @@ class PaymentActivity : AppCompatActivity() {
                 val card = binding.etCardNumber.text.toString().trim()
                 val expiry = binding.etExpiry.text.toString().trim()
                 val cvv = binding.etCvv.text.toString().trim()
-                if (card.length < 16) {
-                    Toast.makeText(this, "Enter valid 16-digit Card Number", Toast.LENGTH_SHORT).show()
-                    false
-                } else if (expiry.isEmpty()) {
-                    Toast.makeText(this, "Enter Expiry Date", Toast.LENGTH_SHORT).show()
-                    false
-                } else if (cvv.length < 3) {
-                    Toast.makeText(this, "Enter 3-digit CVV", Toast.LENGTH_SHORT).show()
-                    false
-                } else true
-            }
-            binding.rbWallet.id -> {
-                if (walletBalance < price) {
-                    Toast.makeText(this, "Insufficient Wallet Balance. Please recharge.", Toast.LENGTH_LONG).show()
-                    false
-                } else true
+                when {
+                    card.length < 16 -> {
+                        Toast.makeText(this, "Enter valid 16-digit Card Number", Toast.LENGTH_SHORT).show()
+                        false
+                    }
+                    expiry.isEmpty() -> {
+                        Toast.makeText(this, "Enter Expiry Date", Toast.LENGTH_SHORT).show()
+                        false
+                    }
+                    cvv.length < 3 -> {
+                        Toast.makeText(this, "Enter 3-digit CVV", Toast.LENGTH_SHORT).show()
+                        false
+                    }
+                    else -> true
+                }
             }
             else -> false
         }
@@ -135,24 +116,22 @@ class PaymentActivity : AppCompatActivity() {
         gigId: String,
         gigTitle: String,
         sellerName: String,
+        sellerId: String,
         packageName: String,
         price: Int,
         requirements: String
     ) {
-        // Store order details for later
         pendingOrderData = Bundle().apply {
             putString("gig_id", gigId)
             putString("gig_title", gigTitle)
             putString("seller_name", sellerName)
+            putString("seller_id", sellerId)
             putString("package_name", packageName)
             putInt("price", price)
             putString("requirements", requirements)
         }
 
-        // Generate a random encrypted-style key
         generatedKey = UUID.randomUUID().toString().substring(0, 8).uppercase()
-
-        // Show the WebView overlay
         binding.authOverlay.visibility = View.VISIBLE
         binding.webView.loadUrl("file:///android_asset/payment_auth.html?auth_key=$generatedKey")
     }
@@ -169,20 +148,20 @@ class PaymentActivity : AppCompatActivity() {
 
     private fun verifyAndProcess(responseKey: String) {
         val expectedResponse = generatedKey?.reversed() + "_VERIFIED"
-        
         if (responseKey == expectedResponse) {
             pendingOrderData?.let { data ->
                 processPayment(
                     data.getString("gig_id") ?: "",
                     data.getString("gig_title") ?: "",
                     data.getString("seller_name") ?: "",
+                    data.getString("seller_id") ?: "",
                     data.getString("package_name") ?: "",
                     data.getInt("price"),
                     data.getString("requirements") ?: ""
                 )
             }
         } else {
-            Toast.makeText(this, "Authentication Failed. Payment Security Breach.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Authentication Failed. Payment cancelled.", Toast.LENGTH_LONG).show()
             binding.btnPay.isEnabled = true
             binding.btnPay.text = "Pay Now"
         }
@@ -192,6 +171,7 @@ class PaymentActivity : AppCompatActivity() {
         gigId: String,
         gigTitle: String,
         sellerName: String,
+        sellerId: String,
         packageName: String,
         price: Int,
         requirements: String
@@ -204,30 +184,19 @@ class PaymentActivity : AppCompatActivity() {
 
             val currentUser = authRepo.currentUser
             if (currentUser == null) {
-                Toast.makeText(this@PaymentActivity, "User session expired", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@PaymentActivity, "Session expired. Please login again.", Toast.LENGTH_SHORT).show()
                 return@launch
-            }
-
-            // Deduct from wallet if selected
-            if (binding.rgPayment.checkedRadioButtonId == binding.rbWallet.id) {
-                val success = authRepo.deductWalletBalance(price)
-                if (!success) {
-                    Toast.makeText(this@PaymentActivity, "Wallet deduction failed", Toast.LENGTH_SHORT).show()
-                    binding.btnPay.isEnabled = true
-                    binding.btnPay.text = "Pay Now"
-                    return@launch
-                }
             }
 
             val order = Order(
                 gigId = gigId,
                 gigTitle = gigTitle,
                 buyerId = currentUser.userId,
-                sellerId = "seller1",
+                sellerId = sellerId.ifEmpty { "unknown_hustlr" },
                 sellerName = sellerName,
                 packageName = packageName,
                 price = price,
-                status = "pending",
+                status = "active",
                 requirements = requirements,
                 progress = 0,
                 createdAt = System.currentTimeMillis()
@@ -236,7 +205,15 @@ class PaymentActivity : AppCompatActivity() {
             val result = orderRepo.placeOrder(order)
             result.fold(
                 onSuccess = { orderId ->
-                    Toast.makeText(this@PaymentActivity, "Payment Successful", Toast.LENGTH_SHORT).show()
+                    lifecycleScope.launch {
+                        val notifyRepo = com.hustl.app.data.repository.NotificationRepository()
+                        notifyRepo.sendNotification(
+                            targetUserId = sellerId,
+                            title = "New Order Placed! 🎉",
+                            body = "${currentUser.name} ordered '${gigTitle}'",
+                            type = "order"
+                        )
+                    }
                     val intent = Intent(this@PaymentActivity, OrderSuccessActivity::class.java)
                     intent.putExtra("order_id", orderId)
                     intent.putExtra("price", price)
@@ -244,7 +221,7 @@ class PaymentActivity : AppCompatActivity() {
                     finish()
                 },
                 onFailure = {
-                    Toast.makeText(this@PaymentActivity, "Payment Failed", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@PaymentActivity, "Payment Failed. Please try again.", Toast.LENGTH_SHORT).show()
                     binding.btnPay.isEnabled = true
                     binding.btnPay.text = "Pay Now"
                 }

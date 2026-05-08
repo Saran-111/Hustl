@@ -8,15 +8,14 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.bottomsheet.BottomSheetDialog
-import com.hustl.app.adapters.PackageAdapter
 import com.hustl.app.adapters.ReviewAdapter
-import com.hustl.app.data.model.GigPackage
 import com.hustl.app.data.repository.AuthRepository
 import com.hustl.app.data.repository.GigRepository
 import com.hustl.app.data.repository.OrderRepository
 import com.hustl.app.databinding.ActivityGigDetailBinding
 import com.hustl.app.databinding.BottomSheetOrderBinding
 import com.hustl.app.ui.chat.ChatActivity
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -31,13 +30,14 @@ class GigDetailActivity : AppCompatActivity() {
     private var isFaved = false
     private var currentGigTitle = ""
     private var currentSellerName = ""
+    private var currentSellerId = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityGigDetailBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        gigRepo = GigRepository(this)
+        gigRepo = GigRepository()
         orderRepo = OrderRepository(this)
         authRepo = AuthRepository(this)
 
@@ -55,6 +55,7 @@ class GigDetailActivity : AppCompatActivity() {
             
             currentGigTitle = gig.title
             currentSellerName = gig.sellerName
+            currentSellerId = gig.sellerId
 
             val emojis = mapOf("Design" to "🎨", "Development" to "💻", "Writing" to "✍️",
                 "Marketing" to "📣", "Video" to "🎬", "Music" to "🎵")
@@ -71,52 +72,73 @@ class GigDetailActivity : AppCompatActivity() {
                 gig.sellerName.split(" ").filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().toString() }
             } else "S"
 
-            val pkgAdapter = PackageAdapter(gig.packages) { idx ->
-                selectedPackageIdx = idx
+            val openProfile = View.OnClickListener {
+                val intent = Intent(this@GigDetailActivity, com.hustl.app.ui.profile.HustlrProfileActivity::class.java)
+                intent.putExtra("hustlr_id", currentSellerId)
+                startActivity(intent)
             }
-            binding.rvPackages.apply {
-                layoutManager = LinearLayoutManager(this@GigDetailActivity)
-                adapter = pkgAdapter
-                isNestedScrollingEnabled = false
+            binding.tvSellerName.setOnClickListener(openProfile)
+            binding.tvSellerInitials.setOnClickListener(openProfile)
+
+            // Load reviews from Firestore (real-time)
+            lifecycleScope.launch {
+                gigRepo.getReviewsForGig(gigId).collectLatest { reviews ->
+                    val reviewAdapter = ReviewAdapter(reviews)
+                    binding.rvReviews.apply {
+                        layoutManager = LinearLayoutManager(this@GigDetailActivity)
+                        adapter = reviewAdapter
+                        isNestedScrollingEnabled = false
+                    }
+                    binding.tvReviewsHeader.text = "Reviews (${reviews.size})"
+                }
             }
 
-            val reviews = gigRepo.getReviews(gigId)
-            val reviewAdapter = ReviewAdapter(reviews)
-            binding.rvReviews.apply {
-                layoutManager = LinearLayoutManager(this@GigDetailActivity)
-                adapter = reviewAdapter
-                isNestedScrollingEnabled = false
+            binding.tvPriceRange.text = "₹${gig.minPrice} - ₹${gig.maxPrice}"
+            binding.tvDelivery.text = "🕒 ${gig.deliveryDays} Days Delivery"
+            binding.tvRevisions.text = "🔄 ${if (gig.revisions == -1) "Unlimited" else "${gig.revisions}"} Revisions"
+
+            val currentUser = authRepo.currentUser
+            if (currentUser?.userId == currentSellerId) {
+                binding.btnOrderNow.visibility = View.GONE
+            } else {
+                binding.btnOrderNow.visibility = View.VISIBLE
+                binding.btnOrderNow.setOnClickListener { showOrderSheet(gig) }
             }
-            binding.tvReviewsHeader.text = "Reviews (${reviews.size})"
-
-            val minPrice = gig.packages.minOfOrNull { it.price } ?: 0
-            binding.tvStartingPrice.text = "From ₹${"%,d".format(minPrice)}"
-
-            binding.btnOrderNow.setOnClickListener { showOrderSheet(gig.packages) }
         }
     }
 
-    private fun showOrderSheet(packages: List<GigPackage>) {
-        val pkg = packages.getOrNull(selectedPackageIdx) ?: packages.first()
+    private fun showOrderSheet(gig: com.hustl.app.data.model.Gig) {
         val dialog = BottomSheetDialog(this)
         val sheetBinding = BottomSheetOrderBinding.inflate(layoutInflater)
         dialog.setContentView(sheetBinding.root)
 
-        sheetBinding.tvPackageName.text = "${pkg.name} Package"
-        sheetBinding.tvPackagePrice.text = "₹${"%,d".format(pkg.price)}"
-        sheetBinding.tvPackageDesc.text = pkg.description
-        sheetBinding.tvDelivery.text = "Delivered in ${pkg.deliveryDays} days"
+        sheetBinding.tvDelivery.text = "Delivered in ${gig.deliveryDays} days"
+        sheetBinding.tvRevisions.text = "${if (gig.revisions == -1) "Unlimited" else "${gig.revisions}"} Revisions"
+        sheetBinding.etFinalPrice.hint = "₹${gig.minPrice} - ₹${gig.maxPrice}"
 
         sheetBinding.btnConfirmOrder.setOnClickListener {
             val requirements = sheetBinding.etRequirements.text.toString()
+            val finalPriceStr = sheetBinding.etFinalPrice.text.toString()
+            
+            if (finalPriceStr.isEmpty()) {
+                sheetBinding.etFinalPrice.error = "Please enter an agreed price"
+                return@setOnClickListener
+            }
+            
+            val price = finalPriceStr.toIntOrNull() ?: 0
+            if (price < gig.minPrice || price > gig.maxPrice) {
+                sheetBinding.etFinalPrice.error = "Price must be within range"
+                return@setOnClickListener
+            }
             
             // Navigate to Payment module
             val intent = Intent(this, PaymentActivity::class.java).apply {
                 putExtra("gig_id", gigId)
                 putExtra("gig_title", currentGigTitle)
                 putExtra("seller_name", currentSellerName)
-                putExtra("package_name", pkg.name)
-                putExtra("price", pkg.price)
+                putExtra("seller_id", currentSellerId)
+                putExtra("package_name", "Custom Order")
+                putExtra("price", price)
                 putExtra("requirements", requirements)
             }
             startActivity(intent)
@@ -138,9 +160,21 @@ class GigDetailActivity : AppCompatActivity() {
     }
 
     private fun openChat() {
-        val intent = Intent(this, ChatActivity::class.java)
-        intent.putExtra("chat_id", "chat1")
-        intent.putExtra("other_name", currentSellerName)
+        val currentUser = authRepo.currentUser
+        if (currentUser == null) {
+            Toast.makeText(this, "Please log in to contact the Hustlr", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (currentUser.userId == currentSellerId) {
+            Toast.makeText(this, "This is your own gig!", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val intent = Intent(this, ChatActivity::class.java).apply {
+            putExtra("other_user_id", currentSellerId)
+            putExtra("other_name", currentSellerName)
+            putExtra("gig_id", gigId)
+            putExtra("gig_title", currentGigTitle)
+        }
         startActivity(intent)
     }
 }

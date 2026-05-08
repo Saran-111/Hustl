@@ -1,67 +1,177 @@
 package com.hustl.app.data.repository
 
 import android.content.Context
-import com.hustl.app.data.local.AppDatabase
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.hustl.app.data.model.Chat
 import com.hustl.app.data.model.Message
+import com.hustl.app.data.model.toFirestoreMap
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
 
 class ChatRepository(context: Context) {
-    private val chatDao = AppDatabase.getDatabase(context).chatDao()
-    private val messageDao = AppDatabase.getDatabase(context).messageDao()
 
-    fun getMyChats(userId: String): Flow<List<Chat>> {
-        return chatDao.getAllChats().onStart {
-            val current = chatDao.getAllChats().first()
-            if (current.isEmpty()) {
-                chatDao.insertChats(getSampleChats())
+    private val db = FirebaseFirestore.getInstance()
+    private val chatsCol = db.collection("chats")
+
+    // ─── Chat List ────────────────────────────────────────────────────────────
+
+    fun getMyChats(userId: String): Flow<List<Chat>> = callbackFlow {
+        val listener = chatsCol
+            .whereArrayContains("participants", userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { trySend(emptyList()); return@addSnapshotListener }
+                val chats = snapshot?.documents
+                    ?.mapNotNull { it.toChat() }
+                    ?.sortedByDescending { it.lastMessageTime }
+                    ?: emptyList()
+                trySend(chats)
             }
-        }
+        awaitClose { listener.remove() }
     }
 
-    fun getMessages(chatId: String): Flow<List<Message>> {
-        return messageDao.getMessagesForChat(chatId).onStart {
-            val current = messageDao.getMessagesForChat(chatId).first()
-            if (current.isEmpty()) {
-                getSampleMessages(chatId).forEach { messageDao.insertMessage(it) }
+    // ─── Messages ─────────────────────────────────────────────────────────────
+
+    fun getMessages(chatId: String): Flow<List<Message>> = callbackFlow {
+        val listener = chatsCol.document(chatId)
+            .collection("messages")
+            .orderBy("timestamp", Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { trySend(emptyList()); return@addSnapshotListener }
+                val messages = snapshot?.documents?.mapNotNull { doc ->
+                    Message(
+                        messageId = doc.id,
+                        chatId = chatId,
+                        senderId = doc.getString("senderId") ?: "",
+                        senderName = doc.getString("senderName") ?: "",
+                        text = doc.getString("text") ?: "",
+                        attachmentUrl = doc.getString("attachmentUrl") ?: "",
+                        type = doc.getString("type") ?: "text",
+                        seen = doc.getBoolean("seen") ?: false,
+                        timestamp = doc.getLong("timestamp") ?: 0L
+                    )
+                } ?: emptyList()
+                trySend(messages)
             }
-        }
+        awaitClose { listener.remove() }
     }
+
+    // ─── Send Message ─────────────────────────────────────────────────────────
 
     suspend fun sendMessage(chatId: String, message: Message): Result<Unit> {
         return try {
-            val messageId = "msg_${System.currentTimeMillis()}"
-            val finalMessage = message.copy(messageId = messageId, chatId = chatId)
-            messageDao.insertMessage(finalMessage)
-            
-            val chat = chatDao.getChatById(chatId)
-            chat?.let {
-                val updatedChat = it.copy(
-                    lastMessage = finalMessage.text,
-                    lastMessageTime = finalMessage.timestamp
+            val messagesCol = chatsCol.document(chatId).collection("messages")
+            val docRef = messagesCol.document()
+            val finalMessage = message.copy(messageId = docRef.id, chatId = chatId)
+
+            db.runBatch { batch ->
+                // Write the message
+                batch.set(docRef, finalMessage.toFirestoreMap())
+                // Update the parent chat document
+                batch.update(
+                    chatsCol.document(chatId),
+                    mapOf(
+                        "lastMessage" to finalMessage.text.ifEmpty { "📎 Attachment" },
+                        "lastMessageTime" to finalMessage.timestamp,
+                        "updatedAt" to finalMessage.timestamp
+                    )
                 )
-                chatDao.updateChat(updatedChat)
-            }
+            }.await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    private fun getSampleChats(): List<Chat> = listOf(
-        Chat(chatId = "chat1", participants = listOf("user1", "seller1"), participantNames = mapOf("user1" to "Arjun M.", "seller1" to "Priya S."), gigTitle = "Logo Design", lastMessage = "I've started on the logo, will send first draft soon!", lastMessageTime = System.currentTimeMillis() - 3600000, unreadCount = 1),
-        Chat(chatId = "chat2", participants = listOf("user1", "seller3"), participantNames = mapOf("user1" to "Arjun M.", "seller3" to "Ananya K."), gigTitle = "Blog Article", lastMessage = "Article delivered! Please check and let me know.", lastMessageTime = System.currentTimeMillis() - 86400000, unreadCount = 0),
-        Chat(chatId = "chat3", participants = listOf("user1", "seller5"), participantNames = mapOf("user1" to "Arjun M.", "seller5" to "Sana T."), gigTitle = "YouTube Edit", lastMessage = "The final cut is ready for review 🎬", lastMessageTime = System.currentTimeMillis() - 259200000, unreadCount = 0)
-    )
+    // ─── Get or Create Chat ───────────────────────────────────────────────────
 
-    private fun getSampleMessages(chatId: String): List<Message> = when (chatId) {
-        "chat1" -> listOf(
-            Message(messageId = "m1", chatId = chatId, senderId = "seller1", senderName = "Priya S.", text = "Hey! Just confirmed your order. Excited to work on your logo 🎨", timestamp = System.currentTimeMillis() - 7200000),
-            Message(messageId = "m2", chatId = chatId, senderId = "user1", senderName = "Arjun M.", text = "Amazing! Can't wait to see your concepts.", timestamp = System.currentTimeMillis() - 6900000),
-            Message(messageId = "m5", chatId = chatId, senderId = "seller1", senderName = "Priya S.", text = "I've started on the logo, will send first draft soon!", timestamp = System.currentTimeMillis() - 3600000)
-        )
-        else -> emptyList()
+    suspend fun getOrCreateChat(
+        currentUserId: String,
+        currentUserName: String,
+        otherUserId: String,
+        otherUserName: String,
+        gigId: String,
+        gigTitle: String
+    ): Result<String> {
+        return try {
+            // Check if a chat already exists between these two users for this gig
+            val existing = chatsCol
+                .whereArrayContains("participants", currentUserId)
+                .whereEqualTo("gigId", gigId)
+                .get()
+                .await()
+
+            val existingChat = existing.documents
+                .firstOrNull { doc ->
+                    val participants = doc.get("participants") as? List<*>
+                    participants?.contains(otherUserId) == true
+                }
+
+            if (existingChat != null) {
+                return Result.success(existingChat.id)
+            }
+
+            // Create a new chat
+            val docRef = chatsCol.document()
+            val chat = mapOf(
+                "chatId" to docRef.id,
+                "participants" to listOf(currentUserId, otherUserId),
+                "participantNames" to mapOf(
+                    currentUserId to currentUserName,
+                    otherUserId to otherUserName
+                ),
+                "gigId" to gigId,
+                "gigTitle" to gigTitle,
+                "lastMessage" to "",
+                "lastMessageTime" to System.currentTimeMillis(),
+                "unreadCounts" to mapOf(currentUserId to 0, otherUserId to 0),
+                "createdAt" to System.currentTimeMillis()
+            )
+            docRef.set(chat).await()
+            Result.success(docRef.id)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
+
+    // ─── Read Receipts ────────────────────────────────────────────────────────
+
+    suspend fun markMessagesAsSeen(chatId: String, currentUserId: String) {
+        try {
+            val unreadMessages = chatsCol.document(chatId)
+                .collection("messages")
+                .whereEqualTo("seen", false)
+                .whereNotEqualTo("senderId", currentUserId)
+                .get()
+                .await()
+
+            if (unreadMessages.isEmpty) return
+            db.runBatch { batch ->
+                unreadMessages.documents.forEach { batch.update(it.reference, "seen", true) }
+            }.await()
+        } catch (_: Exception) {}
+    }
+}
+
+// ─── DocumentSnapshot extension ───────────────────────────────────────────────
+
+@Suppress("UNCHECKED_CAST")
+private fun com.google.firebase.firestore.DocumentSnapshot.toChat(): Chat? {
+    val id = this.id.ifEmpty { return null }
+    return try {
+        val participants = get("participants") as? List<String> ?: emptyList()
+        val participantNames = get("participantNames") as? Map<String, String> ?: emptyMap()
+        Chat(
+            chatId = id,
+            participants = participants,
+            participantNames = participantNames,
+            gigId = getString("gigId") ?: "",
+            gigTitle = getString("gigTitle") ?: "",
+            lastMessage = getString("lastMessage") ?: "",
+            lastMessageTime = getLong("lastMessageTime") ?: 0L,
+            unreadCount = (getLong("unreadCount") ?: 0L).toInt()
+        )
+    } catch (_: Exception) { null }
 }

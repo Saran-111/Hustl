@@ -37,7 +37,7 @@ class HomeFragment : Fragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        gigRepo = GigRepository(requireContext())
+        gigRepo = GigRepository()
         authRepo = AuthRepository(requireContext())
     }
 
@@ -54,6 +54,15 @@ class HomeFragment : Fragment() {
         observeGigs()
         setupClickListeners()
         updateUserProfile()
+
+        binding.swipeRefreshLayout.setOnRefreshListener {
+            refreshData()
+        }
+    }
+
+    private fun refreshData() {
+        updateUserProfile()
+        observeGigs() // Re-triggers the Flow collection
     }
 
     private fun updateUserProfile() {
@@ -68,14 +77,18 @@ class HomeFragment : Fragment() {
         binding.btnProfile.setOnClickListener {
             requireActivity().findViewById<BottomNavigationView>(R.id.bottom_nav).selectedItemId = R.id.nav_profile
         }
+
+        binding.btnNotification.setOnClickListener {
+            startActivity(Intent(requireContext(), NotificationsActivity::class.java))
+        }
         
         binding.btnExplore.setOnClickListener {
             // Smooth scroll to the gigs section
-            binding.root.smoothScrollTo(0, binding.tvGridTitle.top)
+            binding.scrollView.smoothScrollTo(0, binding.tvGridTitle.top)
         }
         
         binding.tvSeeAll.setOnClickListener {
-            binding.root.smoothScrollTo(0, binding.tvGridTitle.top)
+            binding.scrollView.smoothScrollTo(0, binding.tvGridTitle.top)
         }
     }
 
@@ -95,10 +108,13 @@ class HomeFragment : Fragment() {
     }
 
     private fun observeGigs() {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val currentUser = authRepo.currentUser
             gigRepo.getAllGigs().collectLatest { gigs ->
-                allGigs = gigs
-                updateFeatured(gigs)
+                // Filter out gigs created by the current user
+                val displayGigs = gigs.filter { it.sellerId != currentUser?.userId }
+                allGigs = displayGigs
+                updateFeatured(displayGigs)
                 applyFilters()
                 
                 val sellers = gigs.distinctBy { it.sellerId }.take(5).map {
@@ -108,6 +124,8 @@ class HomeFragment : Fragment() {
                     layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
                     adapter = SellerAdapter(sellers)
                 }
+
+                binding.swipeRefreshLayout.isRefreshing = false
             }
         }
     }

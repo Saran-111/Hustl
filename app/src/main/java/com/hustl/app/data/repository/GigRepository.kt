@@ -1,89 +1,244 @@
 package com.hustl.app.data.repository
 
 import android.content.Context
-import com.hustl.app.data.local.AppDatabase
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import com.hustl.app.data.model.Gig
 import com.hustl.app.data.model.Review
+import com.hustl.app.data.model.toFirestoreMap
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
 
-class GigRepository(context: Context) {
-    private val gigDao = AppDatabase.getDatabase(context).gigDao()
+class GigRepository() {
 
-    fun getAllGigs(): Flow<List<Gig>> {
-        return gigDao.getAllGigs().onStart {
-            // Seed data if empty
-            val currentGigs = gigDao.getAllGigs().first()
-            if (currentGigs.isEmpty()) {
-                gigDao.insertGigs(getSampleGigs())
+    private val db = FirebaseFirestore.getInstance()
+    private val gigsCol = db.collection("gigs")
+    private val reviewsCol = db.collection("reviews")
+
+    // ─── Browse / Search ──────────────────────────────────────────────────────
+
+    fun getAllGigs(): Flow<List<Gig>> = callbackFlow {
+        val listener = gigsCol
+            .whereEqualTo("isActive", true)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { trySend(emptyList()); return@addSnapshotListener }
+                val gigs = snapshot?.documents
+                    ?.mapNotNull { it.toGig() }
+                    ?.sortedByDescending { it.createdAt }
+                    ?: emptyList()
+                trySend(gigs)
             }
-        }
+        awaitClose { listener.remove() }
     }
 
     fun getGigsByCategory(category: String): Flow<List<Gig>> {
-        return if (category == "All") getAllGigs() else gigDao.getGigsByCategory(category)
+        if (category == "All") return getAllGigs()
+        return callbackFlow {
+            val listener = gigsCol
+                .whereEqualTo("isActive", true)
+                .whereEqualTo("category", category)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) { trySend(emptyList()); return@addSnapshotListener }
+                    val gigs = snapshot?.documents
+                        ?.mapNotNull { it.toGig() }
+                        ?.sortedByDescending { it.createdAt }
+                        ?: emptyList()
+                    trySend(gigs)
+                }
+            awaitClose { listener.remove() }
+        }
+    }
+
+    fun getGigsByHustlr(sellerId: String): Flow<List<Gig>> = callbackFlow {
+        val listener = gigsCol
+            .whereEqualTo("sellerId", sellerId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { trySend(emptyList()); return@addSnapshotListener }
+                val gigs = snapshot?.documents
+                    ?.mapNotNull { it.toGig() }
+                    ?.sortedByDescending { it.createdAt }
+                    ?: emptyList()
+                trySend(gigs)
+            }
+        awaitClose { listener.remove() }
     }
 
     suspend fun getGigById(gigId: String): Gig? {
-        return gigDao.getGigById(gigId)
+        return try {
+            val doc = gigsCol.document(gigId).get().await()
+            doc.toGig()
+        } catch (_: Exception) { null }
     }
+
+    // ─── Create / Edit / Delete ───────────────────────────────────────────────
 
     suspend fun createGig(gig: Gig): Result<String> {
         return try {
-            val gigId = "gig_${System.currentTimeMillis()}"
-            val gigWithId = gig.copy(gigId = gigId)
-            gigDao.insertGigs(listOf(gigWithId))
-            Result.success(gigId)
+            val docRef = gigsCol.document()
+            val gigWithId = gig.copy(gigId = docRef.id)
+            docRef.set(gigWithId.toFirestoreMap()).await()
+            Result.success(docRef.id)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    fun getReviews(gigId: String): List<Review> = getSampleReviews(gigId)
+    suspend fun updateGig(gig: Gig): Result<Unit> {
+        return try {
+            gigsCol.document(gig.gigId).set(gig.toFirestoreMap()).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
-    fun getSampleGigs(): List<Gig> = listOf(
-        Gig(gigId = "gig1", sellerId = "seller1", sellerName = "Priya S.", title = "I will design a stunning logo with unlimited revisions", description = "Get a professional, memorable logo that represents your brand identity.", category = "Design", tags = listOf("logo", "branding", "design"), rating = 4.9, reviewCount = 142,
-            packages = listOf(
-                com.hustl.app.data.model.GigPackage("Basic", 999, "1 concept, 2 revisions", 3, 2, listOf("1 Logo Concept", "2 Revisions", "PNG & JPG")),
-                com.hustl.app.data.model.GigPackage("Standard", 2499, "3 concepts, unlimited revisions", 2, -1, listOf("3 Logo Concepts", "Unlimited Revisions", "All File Formats")),
-                com.hustl.app.data.model.GigPackage("Premium", 4999, "5 concepts + full brand kit", 1, -1, listOf("5 Logo Concepts", "Full Brand Kit", "Source Files"))
-            )),
-        Gig(gigId = "gig2", sellerId = "seller2", sellerName = "Rahul D.", title = "I will build a full-stack React + Node.js web application", description = "I build scalable, high-performance web applications using modern technologies.", category = "Development", tags = listOf("react", "nodejs", "fullstack"), rating = 4.8, reviewCount = 98,
-            packages = listOf(
-                com.hustl.app.data.model.GigPackage("Basic", 4999, "Landing page, 5 pages", 7, 2, listOf("5 Page Website", "Responsive Design")),
-                com.hustl.app.data.model.GigPackage("Standard", 12999, "Full app with auth & database", 14, 3, listOf("Full Web App", "Auth System", "Database")),
-                com.hustl.app.data.model.GigPackage("Premium", 24999, "Enterprise-grade application", 21, -1, listOf("Everything in Standard", "Payment Integration"))
-            )),
-        Gig(gigId = "gig3", sellerId = "seller3", sellerName = "Ananya K.", title = "I will write SEO-optimized blog posts and articles", description = "Compelling, well-research content that ranks on Google.", category = "Writing", tags = listOf("seo", "blog", "content", "writing"), rating = 5.0, reviewCount = 76,
-            packages = listOf(
-                com.hustl.app.data.model.GigPackage("Basic", 599, "500 word article", 2, 1, listOf("500 Words", "SEO Keywords")),
-                com.hustl.app.data.model.GigPackage("Standard", 1499, "1500 word in-depth article", 1, 3, listOf("1500 Words", "Meta Description")),
-                com.hustl.app.data.model.GigPackage("Premium", 3999, "5 article content bundle", 5, -1, listOf("5 × 1500 Words", "Full SEO Audit"))
-            )),
-        Gig(gigId = "gig4", sellerId = "seller4", sellerName = "Dev M.", title = "I will create scroll-stopping social media content", description = "Full social media management and strategy.", category = "Marketing", tags = listOf("social media", "instagram", "marketing"), rating = 4.7, reviewCount = 55,
-            packages = listOf(
-                com.hustl.app.data.model.GigPackage("Basic", 1499, "10 posts for 1 platform", 7, 2, listOf("10 Posts", "Captions")),
-                com.hustl.app.data.model.GigPackage("Standard", 3999, "30 posts for 3 platforms", 14, 3, listOf("30 Posts", "3 Platforms")),
-                com.hustl.app.data.model.GigPackage("Premium", 8999, "Full monthly management", 30, -1, listOf("Unlimited Posts", "All Platforms"))
-            )),
-        Gig(gigId = "gig5", sellerId = "seller5", sellerName = "Sana T.", title = "I will edit your YouTube video with pro motion graphics", description = "Cinema-quality video editing for YouTube and ads.", category = "Video", tags = listOf("video editing", "youtube", "motion graphics"), rating = 4.9, reviewCount = 203,
-            packages = listOf(
-                com.hustl.app.data.model.GigPackage("Basic", 2499, "Up to 5 min basic edit", 3, 2, listOf("Up to 5 Minutes", "Basic Cuts")),
-                com.hustl.app.data.model.GigPackage("Standard", 5999, "Up to 15 min with graphics", 2, 3, listOf("Up to 15 Minutes", "Motion Graphics")),
-                com.hustl.app.data.model.GigPackage("Premium", 11999, "Full production edit", 1, -1, listOf("Any Length", "3D Graphics"))
-            )),
-        Gig(gigId = "gig6", sellerId = "seller1", sellerName = "Priya S.", title = "I will compose original music & sound design", description = "Original, royalty-free music composition.", category = "Music", tags = listOf("music", "composition", "sound design"), rating = 4.8, reviewCount = 34,
-            packages = listOf(
-                com.hustl.app.data.model.GigPackage("Basic", 1999, "30 second track", 5, 1, listOf("30 Second Track", "1 Revision")),
-                com.hustl.app.data.model.GigPackage("Standard", 4999, "2 minute track with stems", 3, 3, listOf("2 Minute Track", "Stem Files")),
-                com.hustl.app.data.model.GigPackage("Premium", 9999, "Full soundtrack", 7, -1, listOf("Up to 10 Minutes", "Full Stems"))
+    suspend fun deleteGig(gigId: String): Result<Unit> {
+        return try {
+            gigsCol.document(gigId).update("isActive", false).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // ─── Reviews ──────────────────────────────────────────────────────────────
+
+    fun getReviewsForGig(gigId: String): Flow<List<Review>> = callbackFlow {
+        val listener = reviewsCol
+            .whereEqualTo("gigId", gigId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { trySend(emptyList()); return@addSnapshotListener }
+                val reviews = snapshot?.documents?.mapNotNull { doc ->
+                    Review(
+                        reviewId = doc.id,
+                        gigId = doc.getString("gigId") ?: "",
+                        orderId = doc.getString("orderId") ?: "",
+                        buyerId = doc.getString("buyerId") ?: "",
+                        buyerName = doc.getString("buyerName") ?: "",
+                        reviewedUserId = doc.getString("reviewedUserId") ?: "",
+                        rating = (doc.getDouble("rating") ?: 5.0).toFloat(),
+                        comment = doc.getString("comment") ?: "",
+                        createdAt = doc.getLong("createdAt") ?: 0L
+                    )
+                }?.sortedByDescending { it.createdAt } ?: emptyList()
+                trySend(reviews)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    // Kept for backward compatibility (GigDetailActivity calls this)
+    fun getReviews(unused: String): List<Review> = emptyList()
+
+    fun getReviewsForUser(userId: String): Flow<List<Review>> = callbackFlow {
+        val listener = reviewsCol
+            .whereEqualTo("reviewedUserId", userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { trySend(emptyList()); return@addSnapshotListener }
+                val reviews = snapshot?.documents?.mapNotNull { doc ->
+                    Review(
+                        reviewId = doc.id,
+                        gigId = doc.getString("gigId") ?: "",
+                        orderId = doc.getString("orderId") ?: "",
+                        buyerId = doc.getString("buyerId") ?: "",
+                        buyerName = doc.getString("buyerName") ?: "",
+                        reviewedUserId = doc.getString("reviewedUserId") ?: "",
+                        rating = (doc.getDouble("rating") ?: 5.0).toFloat(),
+                        comment = doc.getString("comment") ?: "",
+                        createdAt = doc.getLong("createdAt") ?: 0L
+                    )
+                }?.sortedByDescending { it.createdAt } ?: emptyList()
+                trySend(reviews)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun addReview(review: Review): Result<Unit> {
+        return try {
+            val batch = db.batch()
+            val reviewRef = reviewsCol.document()
+            val reviewWithId = review.copy(reviewId = reviewRef.id)
+            
+            // 1. Add review
+            batch.set(reviewRef, hashMapOf(
+                "reviewId" to reviewWithId.reviewId,
+                "gigId" to reviewWithId.gigId,
+                "orderId" to reviewWithId.orderId,
+                "buyerId" to reviewWithId.buyerId,
+                "buyerName" to reviewWithId.buyerName,
+                "reviewedUserId" to reviewWithId.reviewedUserId,
+                "rating" to reviewWithId.rating.toDouble(),
+                "comment" to reviewWithId.comment,
+                "createdAt" to reviewWithId.createdAt
             ))
-    )
 
-    fun getSampleReviews(gigId: String): List<Review> = listOf(
-        Review(reviewId = "r1", gigId = gigId, buyerName = "Vikram T.", rating = 5f, comment = "Incredible work!"),
-        Review(reviewId = "r2", gigId = gigId, buyerName = "Meera R.", rating = 5f, comment = "Fast and professional."),
-        Review(reviewId = "r3", gigId = gigId, buyerName = "Amar J.", rating = 4f, comment = "Great quality work.")
-    )
+            // 2. Fetch all reviews to calculate new average
+            val allReviews = reviewsCol.whereEqualTo("reviewedUserId", reviewWithId.reviewedUserId).get().await()
+            val ratings = allReviews.documents.mapNotNull { it.getDouble("rating") }.toMutableList()
+            ratings.add(reviewWithId.rating.toDouble())
+            
+            val newAvg = ratings.average()
+            val total = ratings.size
+
+            // 3. Update Hustlr profile
+            val userRef = db.collection("users").document(reviewWithId.reviewedUserId)
+            batch.set(userRef, mapOf("rating" to newAvg, "reviewCount" to total), SetOptions.merge())
+
+            // 4. Update the specific Gig
+            val gigRef = gigsCol.document(reviewWithId.gigId)
+            batch.set(gigRef, mapOf("rating" to newAvg, "reviewCount" to total), SetOptions.merge())
+
+            batch.commit().await()
+            
+            // Background: Update other gigs for this hustlr (less critical)
+            recalculateOtherGigs(reviewWithId.reviewedUserId, newAvg, total)
+            
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("Hustl", "Review batch failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun recalculateOtherGigs(hustlrId: String, newAvg: Double, total: Int) {
+        try {
+            val gigs = gigsCol.whereEqualTo("sellerId", hustlrId).get().await()
+            for (doc in gigs.documents) {
+                doc.reference.set(mapOf("rating" to newAvg, "reviewCount" to total), SetOptions.merge()).await()
+            }
+        } catch (_: Exception) {}
+    }
+
+
+}
+
+// ─── DocumentSnapshot extension ───────────────────────────────────────────────
+
+@Suppress("UNCHECKED_CAST")
+private fun com.google.firebase.firestore.DocumentSnapshot.toGig(): Gig? {
+    val id = this.id.ifEmpty { return null }
+    return try {
+        val tags = get("tags") as? List<String> ?: emptyList()
+        Gig(
+            gigId = id,
+            sellerId = getString("sellerId") ?: "",
+            sellerName = getString("sellerName") ?: "",
+            sellerImageUrl = getString("sellerImageUrl") ?: "",
+            title = getString("title") ?: "",
+            description = getString("description") ?: "",
+            category = getString("category") ?: "",
+            tags = tags,
+            imageUrl = getString("imageUrl") ?: "",
+            rating = getDouble("rating") ?: 0.0,
+            reviewCount = (getLong("reviewCount") ?: 0L).toInt(),
+            minPrice = (getLong("minPrice") ?: 0L).toInt(),
+            maxPrice = (getLong("maxPrice") ?: 0L).toInt(),
+            deliveryDays = (getLong("deliveryDays") ?: 3L).toInt(),
+            revisions = (getLong("revisions") ?: 1L).toInt(),
+            createdAt = getLong("createdAt") ?: 0L,
+            isActive = getBoolean("isActive") ?: true
+        )
+    } catch (_: Exception) { null }
 }

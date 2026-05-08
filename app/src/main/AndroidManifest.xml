@@ -44,21 +44,32 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".ui.home.NotificationsActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ui.gigs.GigDetailActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".ui.profile.HustlrProfileActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.gigs.CreateGigActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- New: Post Gig activity for Hustlrs -->
         <activity
-            android:name=".ui.gigs.PaymentActivity"
+            android:name=".ui.gigs.PostGigActivity"
             android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize"
+            android:label="Post a Gig" />
 
         <activity
-            android:name=".ui.gigs.WalletActivity"
+            android:name=".ui.gigs.PaymentActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 

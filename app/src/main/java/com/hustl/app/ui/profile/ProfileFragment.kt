@@ -9,11 +9,11 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.hustl.app.data.repository.AuthRepository
+import com.hustl.app.data.repository.GigRepository
 import com.hustl.app.data.repository.OrderRepository
 import com.hustl.app.databinding.FragmentProfileBinding
+import com.hustl.app.ui.profile.HustlrProfileActivity
 import com.hustl.app.ui.auth.LoginActivity
-import com.hustl.app.ui.gigs.CreateGigActivity
-import com.hustl.app.ui.gigs.WalletActivity
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -23,11 +23,13 @@ class ProfileFragment : Fragment() {
     private val binding get() = _binding!!
     private lateinit var authRepo: AuthRepository
     private lateinit var orderRepo: OrderRepository
+    private lateinit var gigRepo: GigRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         authRepo = AuthRepository(requireContext())
         orderRepo = OrderRepository(requireContext())
+        gigRepo = GigRepository()
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -45,17 +47,15 @@ class ProfileFragment : Fragment() {
             ).selectedItemId = com.hustl.app.R.id.nav_orders
         }
 
-        binding.menuCreateGig.setOnClickListener {
-            startActivity(Intent(requireContext(), CreateGigActivity::class.java))
+        binding.menuViewProfile.setOnClickListener {
+            val currentUser = authRepo.currentUser ?: return@setOnClickListener
+            val intent = Intent(requireContext(), HustlrProfileActivity::class.java)
+            intent.putExtra("hustlr_id", currentUser.userId)
+            startActivity(intent)
         }
 
         binding.menuSaved.setOnClickListener {
             Toast.makeText(requireContext(), "Saved gigs coming soon!", Toast.LENGTH_SHORT).show()
-        }
-
-        binding.menuPayments.setOnClickListener {
-            // Updated to open the dynamic Wallet screen
-            startActivity(Intent(requireContext(), WalletActivity::class.java))
         }
 
         binding.menuSettings.setOnClickListener {
@@ -71,32 +71,43 @@ class ProfileFragment : Fragment() {
 
     private fun loadUserData() {
         val currentUser = authRepo.currentUser ?: return
-        
-        lifecycleScope.launch {
+
+        viewLifecycleOwner.lifecycleScope.launch {
             val user = authRepo.getUserProfile(currentUser.userId)
-            
+
             binding.tvName.text = user.name.ifEmpty { "User" }
-            binding.tvRole.text = "${user.role.replaceFirstChar { it.uppercase() }} · Member since 2024"
+
+            // Show role badge with hustlr terminology
+            val roleBadge = if (user.role == "hustlr") "⚡ Hustlr" else "🛒 Buyer"
+            binding.tvRole.text = "$roleBadge · Member since 2024"
             binding.tvLocation.text = user.location.ifEmpty { "Location not set" }
             binding.tvRating.text = String.format("%.1f", user.rating)
 
+            if (user.role == "hustlr") {
+                binding.menuViewProfile.visibility = View.VISIBLE
+            }
+
             orderRepo.getMyOrders(user.userId).collectLatest { orders ->
                 binding.tvTotalOrders.text = orders.size.toString()
-                binding.tvReviews.text = (orders.size / 2).toString()
+                
+                // Get actual review count from repository
+                lifecycleScope.launch {
+                    gigRepo.getReviewsForUser(user.userId).collectLatest { reviews ->
+                        binding.tvReviews.text = reviews.size.toString()
+                    }
+                }
 
-                if (user.role == "seller") {
+                if (user.role == "hustlr") {
                     binding.tvBalanceLabel.text = "Total Earnings"
-                    val totalEarnings = orders.filter { it.status == "completed" }.sumOf { it.price }
+                    val totalEarnings = orders.filter { it.status == "completed" && it.sellerId == user.userId }.sumOf { it.price }
                     binding.tvTotalSpent.text = "₹${"%,d".format(totalEarnings)}"
-                    binding.tvBalanceFooter.text = "From ${orders.count { it.status == "completed" }} completed orders"
-                    binding.menuCreateGig.visibility = View.VISIBLE
+                    binding.tvBalanceFooter.text = "From ${orders.count { it.status == "completed" && it.sellerId == user.userId }} completed gigs"
                 } else {
-                    binding.tvBalanceLabel.text = "Wallet Balance"
-                    // Show live wallet balance in the main card
-                    binding.tvTotalSpent.text = "₹${"%,d".format(user.walletBalance)}"
-                    val activeCount = orders.count { it.status == "active" || it.status == "pending" }
-                    binding.tvBalanceFooter.text = "Across ${orders.size} orders · $activeCount active"
-                    binding.menuCreateGig.visibility = View.GONE
+                    binding.tvBalanceLabel.text = "Total Spent"
+                    val totalSpent = orders.filter { it.status == "completed" && it.buyerId == user.userId }.sumOf { it.price }
+                    binding.tvTotalSpent.text = "₹${"%,d".format(totalSpent)}"
+                    val activeCount = orders.count { (it.status == "active" || it.status == "pending") && it.buyerId == user.userId }
+                    binding.tvBalanceFooter.text = "Across ${orders.count { it.buyerId == user.userId }} orders · $activeCount active"
                 }
             }
         }

@@ -1,41 +1,145 @@
 package com.hustl.app.data.repository
 
 import android.content.Context
-import com.hustl.app.data.local.AppDatabase
+import com.google.firebase.firestore.FirebaseFirestore
 import com.hustl.app.data.model.Order
+import com.hustl.app.data.model.toFirestoreMap
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.tasks.await
 
 class OrderRepository(context: Context) {
-    private val orderDao = AppDatabase.getDatabase(context).orderDao()
+
+    private val db = FirebaseFirestore.getInstance()
+    private val ordersCol = db.collection("orders")
+
+    // ─── Place Order ──────────────────────────────────────────────────────────
 
     suspend fun placeOrder(order: Order): Result<String> {
         return try {
-            val orderId = "HU-${(1000..9999).random()}"
-            val orderWithId = order.copy(orderId = orderId)
-            orderDao.insertOrder(orderWithId)
-            Result.success(orderId)
+            val docRef = ordersCol.document()
+            val orderWithId = order.copy(orderId = docRef.id)
+            docRef.set(orderWithId.toFirestoreMap()).await()
+            Result.success(docRef.id)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
+    // ─── Get My Orders (buyer + hustlr merged) ────────────────────────────────
+    // Firestore can't do OR across different fields, so we run two queries and merge
+
     fun getMyOrders(userId: String): Flow<List<Order>> {
-        return orderDao.getOrdersForUser(userId).onStart {
-            val current = orderDao.getOrdersForUser(userId).first()
-            if (current.isEmpty() && userId == "user1") {
-                getSampleOrders().forEach { orderDao.insertOrder(it) }
-            }
+        val asBuyer = ordersAsBuyer(userId)
+        val asHustlr = ordersAsHustlr(userId)
+        return asBuyer.combine(asHustlr) { buyerOrders, hustlrOrders ->
+            (buyerOrders + hustlrOrders)
+                .distinctBy { it.orderId }
+                .sortedByDescending { it.createdAt }
         }
     }
 
-    fun getSampleOrders(): List<Order> = listOf(
-        Order(orderId = "HU-0039", gigId = "gig1", gigTitle = "Logo Design for TechFlow Startup", buyerId = "user1", sellerId = "seller1", sellerName = "Priya S.", packageName = "Standard", price = 2499, status = "active", progress = 65),
-        Order(orderId = "HU-0038", gigId = "gig3", gigTitle = "Blog Post: AI Trends in 2026", buyerId = "user1", sellerId = "seller3", sellerName = "Ananya K.", packageName = "Standard", price = 1499, status = "completed", progress = 100),
-        Order(orderId = "HU-0037", gigId = "gig5", gigTitle = "YouTube Edit – Product Launch Video", buyerId = "user1", sellerId = "seller5", sellerName = "Sana T.", packageName = "Standard", price = 5999, status = "completed", progress = 100),
-        Order(orderId = "HU-0040", gigId = "gig4", gigTitle = "Social Media Content Strategy", buyerId = "user1", sellerId = "seller4", sellerName = "Dev M.", packageName = "Standard", price = 3999, status = "pending", progress = 0),
-        Order(orderId = "HU-0036", gigId = "gig2", gigTitle = "React Sales Dashboard App", buyerId = "user1", sellerId = "seller2", sellerName = "Rahul D.", packageName = "Standard", price = 12999, status = "completed", progress = 100),
-        Order(orderId = "HU-0041", gigId = "gig7", gigTitle = "Brand Identity Design – Full Package", buyerId = "user1", sellerId = "seller3", sellerName = "Ananya K.", packageName = "Standard", price = 7999, status = "active", progress = 30)
-    )
+    private fun ordersAsBuyer(userId: String): Flow<List<Order>> = callbackFlow {
+        val listener = ordersCol
+            .whereEqualTo("buyerId", userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { trySend(emptyList()); return@addSnapshotListener }
+                val orders = snapshot?.documents?.mapNotNull { it.toOrder() } ?: emptyList()
+                trySend(orders)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    private fun ordersAsHustlr(userId: String): Flow<List<Order>> = callbackFlow {
+        val listener = ordersCol
+            .whereEqualTo("sellerId", userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { trySend(emptyList()); return@addSnapshotListener }
+                val orders = snapshot?.documents?.mapNotNull { it.toOrder() } ?: emptyList()
+                trySend(orders)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    // ─── Update Order Status ──────────────────────────────────────────────────
+
+    suspend fun updateOrderStatus(orderId: String, status: String): Result<Unit> {
+        return try {
+            ordersCol.document(orderId).update(
+                mapOf(
+                    "status" to status,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun requestRevision(orderId: String, note: String): Result<Unit> {
+        return try {
+            ordersCol.document(orderId).update(
+                mapOf(
+                    "status" to "active",
+                    "revisionNote" to note,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun cancelOrder(orderId: String): Result<Unit> {
+        return try {
+            ordersCol.document(orderId).update(
+                mapOf(
+                    "status" to "cancelled",
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun markRatingGiven(orderId: String): Result<Unit> {
+        return try {
+            ordersCol.document(orderId).update("ratingGiven", true).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+}
+
+// ─── DocumentSnapshot extension ───────────────────────────────────────────────
+
+private fun com.google.firebase.firestore.DocumentSnapshot.toOrder(): Order? {
+    val id = this.id.ifEmpty { return null }
+    return try {
+        Order(
+            orderId = id,
+            gigId = getString("gigId") ?: "",
+            gigTitle = getString("gigTitle") ?: "",
+            buyerId = getString("buyerId") ?: "",
+            buyerName = getString("buyerName") ?: "",
+            sellerId = getString("sellerId") ?: "",
+            sellerName = getString("sellerName") ?: "",
+            packageName = getString("packageName") ?: "",
+            price = (getLong("price") ?: 0L).toInt(),
+            status = getString("status") ?: "pending",
+            requirements = getString("requirements") ?: "",
+            progress = (getLong("progress") ?: 0L).toInt(),
+            revisionNote = getString("revisionNote") ?: "",
+            ratingGiven = getBoolean("ratingGiven") ?: false,
+            createdAt = getLong("createdAt") ?: 0L,
+            deliveryDate = getLong("deliveryDate") ?: 0L
+        )
+    } catch (_: Exception) { null }
 }

@@ -47,28 +47,27 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Standard Package"
+                android:text="Your Custom Order"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:textColor="@color/text_primary"/>
 
-            <TextView
-                android:id="@+id/tvPackagePrice"
-                android:layout_width="wrap_content"
+            <EditText
+                android:id="@+id/etFinalPrice"
+                android:layout_width="100dp"
                 android:layout_height="wrap_content"
-                android:textSize="22sp"
+                android:hint="₹ Price"
+                android:inputType="number"
+                android:textColor="@color/accent"
+                android:textColorHint="@color/text_hint"
+                android:background="@android:color/transparent"
+                android:textSize="20sp"
                 android:textStyle="bold"
-                android:textColor="@color/accent"/>
+                android:gravity="end" />
 
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/tvPackageDesc"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="10dp"/>
+
 
         <LinearLayout
             android:layout_width="match_parent"

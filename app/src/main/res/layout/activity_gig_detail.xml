@@ -169,15 +169,52 @@
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
 
-                <!-- Starting Price -->
-                <TextView
-                    android:id="@+id/tvStartingPrice"
-                    android:layout_width="wrap_content"
+                <!-- Pricing Info -->
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="15sp"
-                    android:textColor="@color/accent"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="12dp" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="12dp">
+                    
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Price Range: "
+                        android:textSize="15sp"
+                        android:textColor="@color/text_secondary" />
+                        
+                    <TextView
+                        android:id="@+id/tvPriceRange"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="18sp"
+                        android:textColor="@color/accent"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="12dp">
+                    <TextView
+                        android:id="@+id/tvDelivery"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="🕒 3 Days Delivery"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_primary" />
+                    <TextView
+                        android:id="@+id/tvRevisions"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="🔄 1 Revision"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_primary" />
+                </LinearLayout>
 
                 <!-- Description -->
                 <TextView
@@ -201,25 +238,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/border"
-                    android:layout_marginBottom="20dp" />
-
-                <!-- Packages Header -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Choose a Package"
-                    android:textSize="17sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text_primary"
-                    android:layout_marginBottom="12dp" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvPackages"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:nestedScrollingEnabled="false" />
-
-                <!-- Divider -->
+                    android:layout_marginVertical="20dp" />
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"

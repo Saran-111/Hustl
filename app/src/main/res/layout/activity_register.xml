@@ -76,7 +76,7 @@
                 android:textColor="@color/text_primary" android:buttonTint="@color/accent"/>
             <RadioButton android:id="@+id/rbSeller" android:layout_width="0dp"
                 android:layout_height="wrap_content" android:layout_weight="1"
-                android:text="Seller / Freelancer"
+                android:text="Hustlr (Freelancer)"
                 android:textColor="@color/text_primary" android:buttonTint="@color/accent"/>
         </RadioGroup>
 

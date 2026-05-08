@@ -9,10 +9,7 @@
         android:name="com.hustl.app.ui.home.HomeFragment"
         android:label="Home" />
 
-    <fragment
-        android:id="@+id/nav_explore"
-        android:name="com.hustl.app.ui.home.HomeFragment"
-        android:label="Explore" />
+
 
     <fragment
         android:id="@+id/nav_orders"
